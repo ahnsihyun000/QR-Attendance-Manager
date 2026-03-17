@@ -1,17 +1,21 @@
-# qr_attendance_manager
+# 📱 QR-Attendance-Manager (QR 출석 관리 시스템)
 
-A new Flutter project.
+배재대학교 컴퓨터공학과 캡스톤프로젝트입니다.
 
-## Getting Started
+## 👥 팀원 및 역할
+* **시현 (팀장)**: 프로젝트 총괄, QR 스캐너 핵심 기능 개발
+* **민겸 (부팀장)**: 프로젝트 폴더 구조 및 아키텍처 가이드라인 수립
+* **민수**: 사용자 UI/UX 디자인 및 로그인/행사 목록 화면 제작
+* **태현**: Firebase 연동 및 FCM 푸시 알림 서버 구축
+* **유림**: 데이터베이스 스키마 설계 및 출석 데이터 통계 분석
 
-This project is a starting point for a Flutter application.
+## 🛠️ 주요 기능 (개발 중)
+* **QR 코드 스캐닝**: 실시간 카메라 연동을 통한 출석 체크
+* **실시간 데이터 연동**: Firebase 기반의 실시간 데이터 처리
+* **푸시 알림**: 행사 시작 및 공지사항 알림 전송
+* **관리자 대시보드**: 행사별 출석 현황 그래프 및 통계 제공
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🚀 시작하기 (팀원 필독)
+1. `git clone` 후 프로젝트 폴더로 이동합니다.
+2. `flutter pub get` 명령어로 필요한 패키지를 설치합니다.
+3. **주의**: `flutter create .` 명령어를 실행하지 마세요. (기존 설정 유지)
