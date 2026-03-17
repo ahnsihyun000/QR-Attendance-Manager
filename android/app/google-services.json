@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "699483259444",
+    "project_id": "qr-attendance-manager-752a6",
+    "storage_bucket": "qr-attendance-manager-752a6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:699483259444:android:6f8c7a709e7e730c720061",
+        "android_client_info": {
+          "package_name": "com.example.qr_attendance_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCU315B4EDu1lktspodO8CNA8zYrrqnInA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
