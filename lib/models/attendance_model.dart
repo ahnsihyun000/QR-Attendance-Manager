@@ -23,6 +23,9 @@ class AttendanceModel {
         timestamp: (json['timestamp'] as Timestamp).toDate(),
         status: json['status'] ?? '출석', // 추가
       );
+  factory AttendanceModel.fromFirestore(DocumentSnapshot doc) {
+    return AttendanceModel.fromJson(doc.data() as Map<String, dynamic>);
+  }
 
   Map<String, dynamic> toJson() => {
     'eventId': eventId,

@@ -26,4 +26,13 @@ class DatabaseService {
       return "error: $e";
     }
   }
+  Stream<List<AttendanceModel>> getAttendanceStream(String eventId) {
+    return _db
+        .collection('Attendance')
+        .where('eventId', isEqualTo: eventId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => AttendanceModel.fromFirestore(doc))
+            .toList());
+  }
 }
