@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/attendance_model.dart';
+import '../models/user_model.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -34,5 +35,23 @@ class DatabaseService {
         .map((snapshot) => snapshot.docs
             .map((doc) => AttendanceModel.fromFirestore(doc))
             .toList());
+  }
+  // 학번(studentId)으로 사용자 정보 가져오기 함수 추가
+  Future<UserModel?> getUserData(String studentId) async {
+    try {
+      // 'users' 컬렉션에서 문서 ID가 스캔한 학번인 것을 찾습니다.
+      DocumentSnapshot doc = await _db.collection('users').doc(studentId).get();
+
+      if (doc.exists) {
+        // 데이터가 있으면 UserModel 객체로 변환
+        return UserModel.fromMap(doc.data() as Map<String, dynamic>);
+      } else {
+        print("사용자를 찾을 수 없습니다.");
+        return null;
+      }
+    } catch (e) {
+      print("사용자 조회 에러: $e");
+      return null;
+    }
   }
 }
