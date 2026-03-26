@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 // 프로젝트 이름이 'qr_attendance_manager'라고 가정합니다. 
 // 만약 에러가 나면 아래 import 문에서 패키지명을 본인 프로젝트명으로 바꾸세요.
-import 'package:qr_attendance_manager/main.dart'; 
 
 void main() {
   testWidgets('App render test', (WidgetTester tester) async {
