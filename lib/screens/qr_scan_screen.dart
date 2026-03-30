@@ -6,7 +6,7 @@ import '../models/attendance_model.dart';
 class QRScanScreen extends StatefulWidget {
   final String eventId; // 현재 진행 중인 행사 ID (예: "capstone_2026")
 
-  const QRScanScreen({Key? key, required this.eventId}) : super(key: key);
+  const QRScanScreen({super.key, required this.eventId});
 
   @override
   State<QRScanScreen> createState() => _QRScanScreenState();
