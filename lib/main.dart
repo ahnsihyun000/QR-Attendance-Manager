@@ -4,7 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'models/attendance_model.dart';
-import 'login_screen.dart';
+import 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,11 +81,16 @@ class _QRScannerPageState extends State<QRScannerPage> {
         status: "출석 완료",
       );
 
-      await FirebaseFirestore.instance.collection('attendance').add(newRecord.toJson());
+      await FirebaseFirestore.instance
+          .collection('attendance')
+          .add(newRecord.toJson());
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("출석 완료: $code"), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text("출석 완료: $code"),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } finally {
@@ -103,12 +108,14 @@ class _QRScannerPageState extends State<QRScannerPage> {
           MobileScanner(
             onDetect: (capture) {
               final barcode = capture.barcodes.first;
-              if (barcode.rawValue != null) _handleAttendance(barcode.rawValue!);
+              if (barcode.rawValue != null)
+                _handleAttendance(barcode.rawValue!);
             },
           ),
           Center(
             child: Container(
-              width: 250, height: 250,
+              width: 250,
+              height: 250,
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.white, width: 2),
                 borderRadius: BorderRadius.circular(12),
@@ -136,7 +143,8 @@ class AttendanceListPage extends StatelessWidget {
             .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
 
           final docs = snapshot.data!.docs;
 
@@ -146,14 +154,26 @@ class AttendanceListPage extends StatelessWidget {
                 margin: const EdgeInsets.all(16),
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Colors.blue, Colors.indigo]),
+                  gradient: const LinearGradient(
+                    colors: [Colors.blue, Colors.indigo],
+                  ),
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("현재 총 출석", style: TextStyle(color: Colors.white, fontSize: 18)),
-                    Text("${docs.length}명", style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                    const Text(
+                      "현재 총 출석",
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
+                    Text(
+                      "${docs.length}명",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -163,12 +183,23 @@ class AttendanceListPage extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final data = docs[index].data() as Map<String, dynamic>;
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 5,
+                      ),
                       child: ListTile(
-                        leading: const CircleAvatar(backgroundColor: Colors.blueGrey, child: Icon(Icons.person, color: Colors.white)),
+                        leading: const CircleAvatar(
+                          backgroundColor: Colors.blueGrey,
+                          child: Icon(Icons.person, color: Colors.white),
+                        ),
                         title: Text(data['userName'] ?? '익명'),
-                        subtitle: Text("출석 시간: ${data['timestamp'] != null ? (data['timestamp'] as Timestamp).toDate().toString().substring(11, 16) : ''}"),
-                        trailing: const Icon(Icons.check_circle, color: Colors.green),
+                        subtitle: Text(
+                          "출석 시간: ${data['timestamp'] != null ? (data['timestamp'] as Timestamp).toDate().toString().substring(11, 16) : ''}",
+                        ),
+                        trailing: const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                        ),
                       ),
                     );
                   },
