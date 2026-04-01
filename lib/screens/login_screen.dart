@@ -39,7 +39,7 @@ class LoginScreen extends StatelessWidget {
                     // 학교 이름 및 타이틀
                     const Text(
                       "배재대학교",
-                      style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold, color: Colors.black87),
+                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
                     ),
                     const SizedBox(height:15),
 
@@ -47,7 +47,7 @@ class LoginScreen extends StatelessWidget {
                     const Text(
                       "출석 확인을 위해\n아래 버튼을 눌러 스캔을 시작하세요.",
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 18, color: Colors.black54, height: 1.5),
+                      style: TextStyle(fontSize: 16, color: Colors.black54, height: 1.3),
                     ),
                     const SizedBox(height: 25),
 
