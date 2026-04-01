@@ -1,81 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../services/database_service.dart';
-import '../models/attendance_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class QRScanScreen extends StatefulWidget {
-  final String eventId; // 현재 진행 중인 행사 ID (예: "capstone_2026")
-
-  const QRScanScreen({super.key, required this.eventId});
+// [1] QR 스캐너 화면
+class QRScannerPage extends StatefulWidget {
+  const QRScannerPage({super.key});
 
   @override
-  State<QRScanScreen> createState() => _QRScanScreenState();
+  State<QRScannerPage> createState() => _QRScannerPageState();
 }
 
-class _QRScanScreenState extends State<QRScanScreen> {
-  final MobileScannerController cameraController = MobileScannerController();
-  final DatabaseService _dbService = DatabaseService();
-  bool isScanning = true; // 중복 스캔 방지용 락(Lock)
+class _QRScannerPageState extends State<QRScannerPage> {
+  bool isProcessing = false; // 중복 스캔 방지 플래그
 
   @override
   Widget build(BuildContext context) {
-    // 💡 날아갔던 Scaffold와 AppBar가 다시 돌아왔습니다!
     return Scaffold(
       appBar: AppBar(
-        title: const Text('QR 출석 스캐너'),
-        actions: [
-          IconButton(
-            iconSize: 32,
-            icon: const Icon(Icons.bolt), // 심플한 번개 플래시 아이콘
-            onPressed: () => cameraController.toggleTorch(),
-          ),
-        ],
+        title: const Text("출석 QR 스캔"),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
       ),
       body: Stack(
         children: [
           MobileScanner(
-            controller: cameraController,
             onDetect: (capture) async {
-              if (!isScanning) return; // 스캔 처리 중이면 무시 (연속 스캔 방지)
+              if (isProcessing) return; // 이미 처리 중이면 무시
 
               final List<Barcode> barcodes = capture.barcodes;
-              for (final barcode in barcodes) {
-                final String? scannedUid = barcode.rawValue;
-
-                if (scannedUid != null) {
-                  setState(() => isScanning = false); // 스캔 멈춤
-
-                  // 모델 생성 (팀원이 추가한 필수 항목인 이름과 시간을 채워줍니다!)
-                  AttendanceModel newAttendance = AttendanceModel(
-                    eventId: widget.eventId,
-                    userUid: scannedUid,
-                    userName: '스캔된 학생', // 👈 팀원이 필수로 만들어둬서 임시로 넣은 값
-                    timestamp: DateTime.now(), // 👈 스캔한 현재 시간 (필수)
-                    status: '사전 등록',
-                  );
-
-                  String result = await _dbService.recordAttendance(
-                    newAttendance,
-                  );
-                  _showResultSnackBar(result);
-
-                  Future.delayed(const Duration(milliseconds: 1500), () {
-                    if (mounted) {
-                      setState(() => isScanning = true);
-                    }
-                  });
-                  break;
-                }
+              if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
+                final String qrCode = barcodes.first.rawValue!;
+                
+                setState(() => isProcessing = true);
+                
+                // 스캔 성공 시 정보 등록 페이지로 이동
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RegistrationPage(qrData: qrCode),
+                  ),
+                );
+                
+                // 돌아오면 다시 스캔 가능하도록 설정
+                setState(() => isProcessing = false);
               }
             },
           ),
+          // QR 스캔 가이드 라인 (시각적 효과)
           Center(
             child: Container(
               width: 250,
               height: 250,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.green, width: 4),
-                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blueAccent, width: 2),
+                borderRadius: BorderRadius.circular(20),
               ),
             ),
           ),
@@ -83,40 +62,121 @@ class _QRScanScreenState extends State<QRScanScreen> {
       ),
     );
   }
+}
 
-  void _showResultSnackBar(String result) {
-    String message = '';
-    Color bgColor = Colors.black;
+// [2] 정보 등록 페이지 (스캔 후 학번/이름 입력)
+class RegistrationPage extends StatefulWidget {
+  final String qrData;
+  const RegistrationPage({super.key, required this.qrData});
 
-    if (result == 'success') {
-      message = '✅ 출석 처리 완료!';
-      bgColor = Colors.green;
-    } else if (result == 'already_checked') {
-      message = '⚠️ 이미 출석 완료된 학생입니다.';
-      bgColor = Colors.orange;
-    } else if (result == 'not_registered') {
-      message = '❌ 사전 신청 명단에 없습니다.';
-      bgColor = Colors.red;
-    } else {
-      message = '오류 발생: 다시 스캔해주세요.';
-      bgColor = Colors.grey;
+  @override
+  State<RegistrationPage> createState() => _RegistrationPageState();
+}
+
+class _RegistrationPageState extends State<RegistrationPage> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _idController = TextEditingController();
+  String? _selectedDept;
+
+  // 배재대학교 학과 리스트 (필요에 따라 수정)
+  final List<String> _paiChaiDepts = [
+    '컴퓨터공학과',
+    '정보통신공학과',
+    'AI소프트웨어공학과',
+    '간호학과',
+    '경영학과',
+    '행정학과',
+    '게임공학과'
+  ];
+
+  // 데이터 전송 함수
+  Future<void> _submitData() async {
+    // 유효성 검사
+    if (_nameController.text.trim().isEmpty || 
+        _idController.text.trim().isEmpty || 
+        _selectedDept == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("모든 정보를 정확히 입력해주세요.")),
+      );
+      return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: bgColor,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    try {
+      // Firebase Firestore에 저장
+      await FirebaseFirestore.instance.collection('attendance').add({
+        'userName': _nameController.text.trim(),
+        'studentId': _idController.text.trim(),
+        'department': _selectedDept,
+        'qrData': widget.qrData,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      
+      // 완료 알림 후 메인화면으로 돌아가기
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("출석이 완료되었습니다!"), backgroundColor: Colors.green),
+      );
+      
+      // 등록 페이지 닫고 스캐너 페이지까지 닫아서 메인으로 이동
+      Navigator.pop(context); 
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("오류가 발생했습니다: $e")),
+      );
+    }
   }
 
   @override
-  void dispose() {
-    cameraController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("출석 정보 입력")),
+      body: SingleChildScrollView( // 키보드 올라올 때 가려짐 방지
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("성함", style: TextStyle(fontWeight: FontWeight.bold)),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(hintText: "이름을 입력하세요"),
+            ),
+            const SizedBox(height: 20),
+            
+            const Text("학번", style: TextStyle(fontWeight: FontWeight.bold)),
+            TextField(
+              controller: _idController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(hintText: "학번을 입력하세요"),
+            ),
+            const SizedBox(height: 20),
+            
+            const Text("학과", style: TextStyle(fontWeight: FontWeight.bold)),
+            DropdownButtonFormField<String>(
+              hint: const Text("학과를 선택하세요"),
+              initialValue: _selectedDept,
+              items: _paiChaiDepts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+              onChanged: (val) => setState(() => _selectedDept = val),
+              decoration: const InputDecoration(contentPadding: EdgeInsets.zero),
+            ),
+            const SizedBox(height: 40),
+            
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _submitData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("출석 완료", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
