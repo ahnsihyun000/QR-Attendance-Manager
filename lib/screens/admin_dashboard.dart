@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/database_service.dart';
-
+//정유림
+import 'package:fl_chart/fl_chart.dart';
 // [1] 관리자 로그인 화면 (Flat 디자인 & 파란색 버튼)
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -187,6 +188,57 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 }
+//정유림
+class AttendancePieChart extends StatelessWidget {
+  final int total;
+  final int present;
+
+  const AttendancePieChart({
+    super.key,
+    required this.total,
+    required this.present,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    int absent = total - present;
+
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        const Text(
+          "출석 통계",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(
+          height: 250,
+          child: PieChart(
+            PieChartData(
+              sections: [
+                PieChartSectionData(
+                  value: present.toDouble(),
+                  title: "참석\n$present",
+                  color: Colors.blue,
+                  radius: 80,
+                  titleStyle: const TextStyle(color: Colors.white),
+                ),
+                PieChartSectionData(
+                  value: absent.toDouble(),
+                  title: "불참\n$absent",
+                  color: Colors.redAccent,
+                  radius: 80,
+                  titleStyle: const TextStyle(color: Colors.white),
+                ),
+              ],
+              sectionsSpace: 2,
+              centerSpaceRadius: 40,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 // [3] 출석 명단 리스트 (현황판 추가 버전)
 //신청자 명단 비교리스트 추가(정유림)
@@ -330,22 +382,46 @@ print("applicants: $applicants");
 
  
 
-// [4] 통계 분석 (작업 예정)
+// [4] 통계 분석 (정유림)
 class AnalyticsDashboardPage extends StatelessWidget {
   const AnalyticsDashboardPage({super.key});
+
+  Future<List<Map<String, dynamic>>> loadCombinedList() async {
+    var attendance = await DatabaseService().getAttendance();
+    var applicants = await DatabaseService().getApplicants();
+
+    return applicants.map((applicant) {
+      bool isPresent = attendance.any(
+        (a) => (a['userName'] ?? '').trim() == (applicant['name'] ?? '').trim()
+      );
+
+      return {
+        'status': isPresent ? "출석" : "미출석",
+      };
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.analytics_outlined, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          const Text("통계 분석 차트 준비 중...", style: TextStyle(color: Colors.grey, fontSize: 18)),
-          const SizedBox(height: 8),
-          const Text("학과별 출석 비율 분석 기능이 예정되어 있습니다.", style: TextStyle(color: Colors.grey)),
-        ],
-      ),
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: loadCombinedList(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final list = snapshot.data!;
+
+        int total = list.length;
+        int present = list.where((e) => e['status'] == "출석").length;
+
+        return Center(
+          child: AttendancePieChart(
+            total: total,
+            present: present,
+          ),
+        );
+      },
     );
   }
 }
