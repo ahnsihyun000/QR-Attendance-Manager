@@ -1,102 +1,163 @@
 import 'package:flutter/material.dart';
-import 'admin_dashboard.dart'; // 관리자 화면 임포트
-import 'qr_scan_screen.dart';   // QR 스캐너 화면 임포트
+// 1. 같은 폴더에 있으므로 파일명만 정확히 입력합니다.
+import 'admin_dashboard.dart'; 
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _idController = TextEditingController();
+  final TextEditingController _pwController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 배경색: 연한 그레이 블루
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: Stack(
           children: [
-            // --- 1. 중앙 메인 콘텐츠 ---
+            // --- 중앙 로그인 폼 ---
             Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 🏫 학교 로고 섹션 (흰 원형 배경 + 그림자)
-                    SizedBox(
-                      width: 150, // 요청하신 사이즈 최적화
-                      height: 150,
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/school_logo.png',
-                          fit: BoxFit.cover,
-                          // 이미지가 없을 경우 표시될 아이콘
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.school, size: 50, color: Colors.blueAccent),
-                        ),
-                      ),
-                    ),
+                    const Icon(Icons.school, size: 80, color: Color(0xFF2563EB)),
                     const SizedBox(height: 10),
-
-                    // 학교 이름 및 타이틀
                     const Text(
                       "배재대학교",
-                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
+                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height:15),
+                    const SizedBox(height: 40),
 
-                    // 인사
-                    const Text(
-                      "출석 확인을 위해\n아래 버튼을 눌러 스캔을 시작하세요.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16, color: Colors.black54, height: 1.3),
+                    // 아이디 입력창
+                    TextField(
+                      controller: _idController,
+                      decoration: InputDecoration(
+                        labelText: "아이디(학번)",
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    // 비밀번호 입력창
+                    TextField(
+                      controller: _pwController,
+                      obscureText: true, // 비밀번호 가리기
+                      decoration: InputDecoration(
+                        labelText: "비밀번호",
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
                     ),
                     const SizedBox(height: 25),
 
-                    // 🔍 메인 액션 버튼 (출석 스캔 시작하기)
+                    // 로그인 버튼
                     SizedBox(
                       width: double.infinity,
-                      height: 60,
-                      child: ElevatedButton.icon(
+                      height: 55,
+                      child: ElevatedButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const QRScannerPage()),
-                          );
+                          // 로그인 버튼 클릭 시 실행될 로직
+                          debugPrint("로그인 시도 아이디: ${_idController.text}");
                         },
-                        icon: const Icon(Icons.qr_code_scanner, size: 24),
-                        label: const Text(
-                          "출석 스캔 시작하기",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2563EB),
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
+                        child: const Text("로그인", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
+                    ),
+
+                    // --- 회원가입 연결 버튼 ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text("계정이 없으신가요?"),
+                        TextButton(
+                          onPressed: () {
+                            // 아래 정의된 회원가입 페이지로 이동
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SignUpPage()),
+                            );
+                          },
+                          child: const Text("회원가입", 
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
 
-            // --- 2. 우측 하단 관리자 설정 버튼 (톱니바퀴) ---
+            // --- 우측 하단 관리자 로그인 버튼 ---
             Positioned(
-              right: 16,
-              bottom: 16,
-              child: IconButton(
+              right: 20,
+              bottom: 20,
+              child: FloatingActionButton.extended(
                 onPressed: () {
+                  // ⭐ [중요] AdminDashboard가 admin_dashboard.dart의 클래스 이름과 같아야 합니다.
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AdminLoginScreen()),
+                    MaterialPageRoute(builder: (context) => const AdminLoginScreen()), 
                   );
                 },
+                label: const Text("관리자 로그인"),
                 icon: const Icon(Icons.settings),
-                iconSize: 28,
-                color: Colors.grey.shade400, // 은은한 회색
-                tooltip: "관리자 설정",
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black54,
+                elevation: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- 별도의 파일로 분리하기 전까지 사용할 회원가입 화면 ---
+class SignUpPage extends StatelessWidget {
+  const SignUpPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("회원가입")),
+      body: Padding(
+        padding: const EdgeInsets.all(30.0),
+        child: Column(
+          children: [
+            const TextField(decoration: InputDecoration(labelText: "이름")),
+            const SizedBox(height: 15),
+            const TextField(decoration: InputDecoration(labelText: "학번")),
+            const SizedBox(height: 15),
+            const TextField(decoration: InputDecoration(labelText: "비밀번호"), obscureText: true),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: () {
+                  // 가입 완료 후 이전 화면(로그인창)으로 돌아가기
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("회원가입이 요청되었습니다.")),
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                child: const Text("가입하기", style: TextStyle(color: Colors.white)),
               ),
             ),
           ],
