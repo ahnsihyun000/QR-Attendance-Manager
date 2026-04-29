@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/database_service.dart';
 //정유림
 import 'package:fl_chart/fl_chart.dart';
+import 'qr_scan_page.dart';
 // [1] 관리자 로그인 화면 (Flat 디자인 & 파란색 버튼)
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -150,10 +151,12 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _selectedIndex = 0;
-  final List<Widget> _pages = [
-    const AttendanceListPage(),
-    const AnalyticsDashboardPage(),
-  ];
+ final List<Widget> _pages = [
+  const AttendanceListPage(),
+  const AnalyticsDashboardPage(),
+  //정유림
+  const QrScanPage(), // 👈 추가
+];
 
   @override
   Widget build(BuildContext context) {
@@ -183,6 +186,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.list_alt_rounded), label: '출석 명단'),
           BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: '통계 분석'),
+          //정유림
+          BottomNavigationBarItem(
+           icon: Icon(Icons.qr_code_scanner),
+           label: 'QR 스캔', // 👈 추가
+           ),
         ],
       ),
     );
