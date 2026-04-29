@@ -53,6 +53,13 @@ class DatabaseService {
               .toList(),
         );
   }
+  //qr 스캔 페이지 데이터베이스 (정유림)
+  Future<void> recordAttendanceByUid(String uid, DateTime time) async {
+  await _db.collection('attendance').add({
+    'uid': uid,
+    'time': time.toIso8601String(),
+  });
+}
  
  //신청자 비교 명단(정유림)
   Future<List<Map<String, dynamic>>> getApplicants() async {
