@@ -1,103 +1,84 @@
 import 'package:flutter/material.dart';
-import 'admin_dashboard.dart'; // 관리자 화면 임포트
-import 'qr_scan_screen.dart';   // QR 스캐너 화면 임포트
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'signup_screen.dart';
+import 'qr_scan_screen.dart'; // 위에서 만든 파일 임포트
+import 'admin_screen.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  _LoginScreenState createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _idController = TextEditingController();
+  final _pwController = TextEditingController();
+  String? _selectedDept;
+
+  final List<String> _departments = ['컴퓨터공학과', '게임공학과', '정보통신공학과', '인공지능학과'];
+
+  Future<void> _login() async {
+    final id = _idController.text.trim();
+    final pw = _pwController.text.trim();
+
+    if (id.isEmpty || pw.isEmpty || _selectedDept == null) return;
+
+    try {
+      var userDoc = await FirebaseFirestore.instance.collection('users').doc(id).get();
+
+      if (!mounted) return;
+
+      if (userDoc.exists && userDoc.data()!['password'] == pw && userDoc.data()!['department'] == _selectedDept) {
+        String role = userDoc.data()!['role'] ?? 'student';
+
+        if (role == 'admin') {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminScreen()));
+        } else {
+          // 여기서 'userData' 파라미터가 qr_scan_screen.dart와 연결됩니다.
+          Navigator.pushReplacement(
+            context, 
+            MaterialPageRoute(builder: (context) => QRScannerPage(userData: userDoc.data()!))
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("로그인 정보가 틀렸습니다.")));
+      }
+    } catch (e) {
+      debugPrint("로그인 에러: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 배경색: 연한 그레이 블루
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: Stack(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
           children: [
-            // --- 1. 중앙 메인 콘텐츠 ---
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // 🏫 학교 로고 섹션 (흰 원형 배경 + 그림자)
-                    SizedBox(
-                      width: 150, // 요청하신 사이즈 최적화
-                      height: 150,
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/school_logo.png',
-                          fit: BoxFit.cover,
-                          // 이미지가 없을 경우 표시될 아이콘
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.school, size: 50, color: Colors.blueAccent),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // 학교 이름 및 타이틀
-                    const Text(
-                      "배재대학교",
-                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
-                    ),
-                    const SizedBox(height:15),
-
-                    // 인사
-                    const Text(
-                      "출석 확인을 위해\n아래 버튼을 눌러 스캔을 시작하세요.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16, color: Colors.black54, height: 1.3),
-                    ),
-                    const SizedBox(height: 25),
-
-                    // 🔍 메인 액션 버튼 (출석 스캔 시작하기)
-                    SizedBox(
-                      width: double.infinity,
-                      height: 60,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const QRScannerPage()),
-                          );
-                        },
-                        icon: const Icon(Icons.qr_code_scanner, size: 24),
-                        label: const Text(
-                          "출석 스캔 시작하기",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 80),
+            const Text("배재대 스마트 출석", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 30),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              value: _selectedDept,
+              items: _departments.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+              onChanged: (v) => setState(() => _selectedDept = v),
+              decoration: const InputDecoration(labelText: "학과 선택", border: OutlineInputBorder()),
             ),
-
-            // --- 2. 우측 하단 관리자 설정 버튼 (톱니바퀴) ---
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AdminLoginScreen()),
-                  );
-                },
-                icon: const Icon(Icons.settings),
-                iconSize: 28,
-                color: Colors.grey.shade400, // 은은한 회색
-                tooltip: "관리자 설정",
-              ),
+            const SizedBox(height: 15),
+            TextField(controller: _idController, decoration: const InputDecoration(labelText: "학번", border: OutlineInputBorder())),
+            const SizedBox(height: 15),
+            TextField(controller: _pwController, decoration: const InputDecoration(labelText: "비밀번호", border: OutlineInputBorder()), obscureText: true),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: _login,
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55)),
+              child: const Text("로그인"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignUpScreen())),
+              child: const Text("처음이신가요? 회원가입"),
             ),
           ],
         ),

@@ -47,6 +47,7 @@ dependencies:
   # 조태현 담당: 위치 및 오프라인 저장용
   geolocator: ^12.0.0
   shared_preferences: ^2.2.3
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
