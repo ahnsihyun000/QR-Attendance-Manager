@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../services/database_service.dart';
+//정유림
+import 'package:fl_chart/fl_chart.dart';
+import 'qr_scan_page.dart';
 // [1] 관리자 로그인 화면 (Flat 디자인 & 파란색 버튼)
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -148,10 +151,12 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _selectedIndex = 0;
-  final List<Widget> _pages = [
-    const AttendanceListPage(),
-    const AnalyticsDashboardPage(),
-  ];
+ final List<Widget> _pages = [
+  const AttendanceListPage(),
+  const AnalyticsDashboardPage(),
+  //정유림
+  const QrScanPage(), // 👈 추가
+];
 
   @override
   Widget build(BuildContext context) {
@@ -181,15 +186,99 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.list_alt_rounded), label: '출석 명단'),
           BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: '통계 분석'),
+          //정유림
+          BottomNavigationBarItem(
+           icon: Icon(Icons.qr_code_scanner),
+           label: 'QR 스캔', // 👈 추가
+           ),
         ],
       ),
     );
   }
 }
+//정유림
+class AttendancePieChart extends StatelessWidget {
+  final int total;
+  final int present;
+
+  const AttendancePieChart({
+    super.key,
+    required this.total,
+    required this.present,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    int absent = total - present;
+
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        const Text(
+          "출석 통계",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(
+          height: 250,
+          child: PieChart(
+            PieChartData(
+              sections: [
+                PieChartSectionData(
+                  value: present.toDouble(),
+                  title: "참석\n$present",
+                  color: Colors.blue,
+                  radius: 80,
+                  titleStyle: const TextStyle(color: Colors.white),
+                ),
+                PieChartSectionData(
+                  value: absent.toDouble(),
+                  title: "불참\n$absent",
+                  color: Colors.redAccent,
+                  radius: 80,
+                  titleStyle: const TextStyle(color: Colors.white),
+                ),
+              ],
+              sectionsSpace: 2,
+              centerSpaceRadius: 40,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 // [3] 출석 명단 리스트 (현황판 추가 버전)
-class AttendanceListPage extends StatelessWidget {
+//신청자 명단 비교리스트 추가(정유림)
+class AttendanceListPage extends StatefulWidget {
   const AttendanceListPage({super.key});
+
+  @override
+  State<AttendanceListPage> createState() => _AttendanceListPageState();
+}
+
+class _AttendanceListPageState extends State<AttendanceListPage> {
+
+  // 전체 신청자 + 출석 비교
+  Future<List<Map<String, dynamic>>> loadCombinedList() async {
+    var attendance = await DatabaseService().getAttendance();
+    var applicants = await DatabaseService().getApplicants();
+    print("attendance: $attendance");
+print("applicants: $applicants");
+
+    List<Map<String, dynamic>> result = applicants.map((applicant) {
+      bool isPresent = attendance.any(
+      (a) => (a['userName'] ?? '').trim() == (applicant['name'] ?? '').trim()
+    );
+      return {
+        'name': applicant['name'],
+        'studentId': applicant['studentId'],
+        'status': isPresent ? "출석" : "미출석",
+      };
+    }).toList();
+
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -197,12 +286,12 @@ class AttendanceListPage extends StatelessWidget {
       stream: FirebaseFirestore.instance.collection('attendance').orderBy('timestamp', descending: true).snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)));
-        
+
         final docs = snapshot.data!.docs;
-        
+
         return CustomScrollView(
           slivers: [
-            // 💡 상단 요약 현황 섹션
+            // 실시간 출석 현황
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -217,70 +306,131 @@ class AttendanceListPage extends StatelessWidget {
                     children: [
                       const Text("현재 총 출석 인원", style: TextStyle(color: Colors.white70, fontSize: 14)),
                       const SizedBox(height: 8),
-                      Text("${docs.length} 명", 
-                        style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                      Text("${docs.length} 명", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
               ),
             ),
 
-            // 💡 실제 출석 명단 리스트
+            // 실시간 출석 리스트
             docs.isEmpty 
-            ? const SliverFillRemaining(child: Center(child: Text("기록된 출석 데이터가 없습니다.")))
-            : SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final data = docs[index].data() as Map<String, dynamic>;
+              ? const SliverFillRemaining(child: Center(child: Text("기록된 출석 데이터가 없습니다.")))
+              : SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final data = docs[index].data() as Map<String, dynamic>;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0.5,
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            leading: CircleAvatar(
+                              // ignore: deprecated_member_use
+                              backgroundColor: const Color(0xFF2563EB).withOpacity(0.1),
+                              child: const Icon(Icons.person, color: Color(0xFF2563EB)),
+                            ),
+                            title: Text("${data['userName'] ?? '이름 없음'} [${data['studentId'] ?? '-'}]", style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text("${data['department'] ?? '학과 미지정'}"),
+                            trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+                          ),
+                        );
+                      },
+                      childCount: docs.length,
+                    ),
+                  ),
+                ),
+
+            // 전체 신청자 출석 현황(정유림)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
+                child: const Text(
+                  "👥 전체 신청자 출석 현황",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: loadCombinedList(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)));
+
+                  final combinedList = snapshot.data!;
+
+                  return Column(
+                    children: combinedList.map((item) {
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: const EdgeInsets.only(bottom: 8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         elevation: 0.5,
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          leading: CircleAvatar(
-                            // ignore: deprecated_member_use
-                            backgroundColor: const Color(0xFF2563EB).withOpacity(0.1),
-                            child: const Icon(Icons.person, color: Color(0xFF2563EB)),
+                          title: Text("${item['name']} (${item['studentId']})"),
+                          trailing: Text(
+                            item['status'],
+                            style: TextStyle(color: item['status'] == "출석" ? Colors.green : Colors.red),
                           ),
-                          title: Text(
-                            "${data['userName'] ?? '이름 없음'} [${data['studentId'] ?? '-'}]",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text("${data['department'] ?? '학과 미지정'}"),
-                          trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
                         ),
                       );
-                    },
-                    childCount: docs.length,
-                  ),
-                ),
+                    }).toList(),
+                  );
+                },
               ),
+            ),
           ],
         );
       },
     );
   }
 }
+  
 
-// [4] 통계 분석 (작업 예정)
+ 
+
+// [4] 통계 분석 (정유림)
 class AnalyticsDashboardPage extends StatelessWidget {
   const AnalyticsDashboardPage({super.key});
+
+  Future<List<Map<String, dynamic>>> loadCombinedList() async {
+    var attendance = await DatabaseService().getAttendance();
+    var applicants = await DatabaseService().getApplicants();
+
+    return applicants.map((applicant) {
+      bool isPresent = attendance.any(
+        (a) => (a['userName'] ?? '').trim() == (applicant['name'] ?? '').trim()
+      );
+
+      return {
+        'status': isPresent ? "출석" : "미출석",
+      };
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.analytics_outlined, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          const Text("통계 분석 차트 준비 중...", style: TextStyle(color: Colors.grey, fontSize: 18)),
-          const SizedBox(height: 8),
-          const Text("학과별 출석 비율 분석 기능이 예정되어 있습니다.", style: TextStyle(color: Colors.grey)),
-        ],
-      ),
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: loadCombinedList(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final list = snapshot.data!;
+
+        int total = list.length;
+        int present = list.where((e) => e['status'] == "출석").length;
+
+        return Center(
+          child: AttendancePieChart(
+            total: total,
+            present: present,
+          ),
+        );
+      },
     );
   }
 }
