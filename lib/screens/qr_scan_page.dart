@@ -50,10 +50,12 @@ String uid = data['uid'];*/
       // ✅ Firestore에 출석 기록
       await DatabaseService().recordAttendanceByUid(uid, now);
 
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('출석 완료: $uid')),
       );
     } catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('오류 발생')),
       );

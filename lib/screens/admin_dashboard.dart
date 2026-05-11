@@ -329,6 +329,7 @@ print("applicants: $applicants");
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             leading: CircleAvatar(
+                              // ignore: deprecated_member_use
                               backgroundColor: const Color(0xFF2563EB).withOpacity(0.1),
                               child: const Icon(Icons.person, color: Color(0xFF2563EB)),
                             ),

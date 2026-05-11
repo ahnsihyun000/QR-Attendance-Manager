@@ -27,8 +27,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.school, size: 80, color: Color(0xFF2563EB)),
-                    const SizedBox(height: 10),
+                    // [수정] Icon을 Image.asset으로 교체
+                    // school_logo.png 이미지를 assets/images/ 폴더에 넣고 pubspec.yaml에 등록해야 합니다.
+                    Image.asset(
+                      'assets/images/school_logo.png', // 이미지 경로
+                      height: 160, // 아이콘 크기와 동일하게 설정
+                      width: 160,
+                      fit: BoxFit.contain, // 비율 유지
+                    ),
+                    const SizedBox(height: 20), // 간격 유지
                     const Text(
                       "배재대학교",
                       style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
@@ -107,13 +114,12 @@ class _LoginScreenState extends State<LoginScreen> {
               bottom: 20,
               child: FloatingActionButton.extended(
                 onPressed: () {
-                  // ⭐ [중요] AdminDashboard가 admin_dashboard.dart의 클래스 이름과 같아야 합니다.
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const AdminLoginScreen()), 
                   );
                 },
-                label: const Text("관리자 로그인"),
+                label: const Text(""),
                 icon: const Icon(Icons.settings),
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black54,
