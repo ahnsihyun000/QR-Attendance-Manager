@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'admin_attendance_list.dart';
 import 'pre_registration_list.dart';
 import 'login_screen.dart';
+//정유림
+import 'admin_qr_camera_tab.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -13,13 +15,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = [
-    const AdminHomeTab(),
-    const AdminAttendanceList(),
-    const Center(
-      child: Text("통계 화면 준비 중", style: TextStyle(color: Color(0xFF8B95A1))),
+  const AdminHomeTab(),
+  const AdminAttendanceList(),
+  //정유림
+  const AdminQrCameraTab(),
+  const Center(
+    child: Text(
+      "통계 화면 준비 중",
+      style: TextStyle(color: Color(0xFF8B95A1)),
     ),
-  ];
-
+  ),
+];
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -71,6 +77,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.fact_check_rounded),
                 label: "출석부",
+              ),
+              //정유림
+              BottomNavigationBarItem(
+                icon: Icon(Icons.qr_code_scanner_rounded),
+                label: "QR카메라",
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.bar_chart_rounded),
