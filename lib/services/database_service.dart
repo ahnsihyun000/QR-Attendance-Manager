@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_database/firebase_database.dart';
 import '../models/attendance_model.dart';
+
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -11,7 +11,7 @@ class DatabaseService {
       String customDocId = "${attendance.eventId}_${attendance.userUid}";
 
       // 2. 해당 학생의 문서가 DB(사전 명단)에 존재하는지 검색
-      DocumentReference docRef = _db.collection('attendance').doc(customDocId);
+      DocumentReference docRef = _db.collection('Attendance').doc(customDocId);
       DocumentSnapshot doc = await docRef.get();
 
       // [판정 1] 사전 명단에 없는 경우 (미신청자 컷!)
@@ -44,7 +44,7 @@ class DatabaseService {
   // 📊 대시보드용 실시간 데이터 스트림 (유림이 담당 - 기존 코드 유지)
   Stream<List<AttendanceModel>> getAttendanceStream(String eventId) {
     return _db
-        .collection('attendance')
+        .collection('Attendance')
         .where('eventId', isEqualTo: eventId)
         .snapshots()
         .map(
@@ -53,44 +53,4 @@ class DatabaseService {
               .toList(),
         );
   }
-  //qr 스캔 페이지 데이터베이스 (정유림)
-  Future<void> recordAttendanceByUid(String uid, DateTime time) async {
-  await _db.collection('attendance').add({
-    'uid': uid,
-    'time': time.toIso8601String(),
-  });
-}
- 
- //신청자 비교 명단(정유림)
-  Future<List<Map<String, dynamic>>> getApplicants() async {
-  final ref = FirebaseDatabase.instance.ref("attendance"); // 경로 수정
-  final snapshot = await ref.get();
-
-  List<Map<String, dynamic>> list = [];
-
-  if (snapshot.exists && snapshot.value != null) {
-    final data = Map<String, dynamic>.from(snapshot.value as Map);
-    data.forEach((key, value) {
-      // key = "김서현_2303030" 형식
-      final parts = key.split('_');
-      String name = parts.isNotEmpty ? parts[0] : '';
-      String studentId = parts.length > 1 ? parts[1] : '';
-
-      list.add({
-        'name': name,
-        'studentId': studentId,
-      });
-    });
-  }
-
-  print("applicants: $list"); // 디버깅용
-  return list;
-}
-  Future<List<Map<String, dynamic>>> getAttendance() async {
-  var snapshot = await FirebaseFirestore.instance
-      .collection('attendance')
-      .get();
-
-  return snapshot.docs.map((doc) => doc.data()).toList();
-}
 }

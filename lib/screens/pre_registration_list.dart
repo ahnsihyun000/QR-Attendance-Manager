@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// TODO: 유림 - Firestore에서 사전 신청 명단 불러오는 로직 구현 필요
 class PreRegistrationScreen extends StatelessWidget {
   const PreRegistrationScreen({super.key});
 
@@ -7,7 +8,7 @@ class PreRegistrationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("사전 신청 명단")),
-      body: const Center(child: Text("여기에 유림이가 준 Firestore 명단이 뜰 예정!")),
+      body: const Center(child: Text("사전 신청 명단 기능 준비 중...")),
     );
   }
 }
