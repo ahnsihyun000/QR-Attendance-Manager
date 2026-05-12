@@ -4,6 +4,7 @@ import 'pre_registration_list.dart';
 import 'login_screen.dart';
 //정유림
 import 'admin_qr_camera_tab.dart';
+import 'package:qr_attendance_manager/screens/pre_registration_list.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
