@@ -11,25 +11,28 @@ class AdminQrCameraTab extends StatefulWidget {
 
 class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
   bool _isProcessing = false;
-  // 스캔 성공 시 테두리 색상을 바꾸기 위한 변수
   Color _overlayColor = Colors.white;
 
+  // 출석 데이터 저장 로직
   Future<void> _saveAttendance(String rawValue) async {
     if (_isProcessing) return;
 
     setState(() {
       _isProcessing = true;
-      _overlayColor = const Color(0xFF3182F6); // 스캔 중 토스 블루색으로 변경
+      _overlayColor = const Color(0xFF3182F6); // 토스 블루색으로 피드백
     });
 
     try {
-      // QR 데이터 파싱 로직 최적화
+      // 1. QR 데이터 파싱 (형식: UID:12345,NAME:홍길동)
       final parts = rawValue.split(',');
-      if (parts.length < 2) throw Exception('잘못된 QR 형식');
+      if (parts.length < 2) throw Exception('유효하지 않은 QR 형식입니다.');
 
       final uid = parts[0].replaceAll('UID:', '').trim();
       final name = parts[1].replaceAll('NAME:', '').trim();
 
+      if (uid.isEmpty || name.isEmpty) throw Exception('데이터가 비어있습니다.');
+
+      // 2. 파이어스토어 저장
       await FirebaseFirestore.instance.collection('attendance').add({
         'uid': uid,
         'name': name,
@@ -37,40 +40,40 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
       });
 
       if (!mounted) return;
+      _showFeedback(isSuccess: true, message: '$name 학생 출석 완료!');
 
-      _showSuccessFeedback(name);
-      
-      // 2초 대기 후 원래 색상으로 복구 및 다시 스캔 가능 상태로
+      // 3. 성공 시 2초간 대기 (중복 스캔 방지)
       await Future.delayed(const Duration(seconds: 2));
+
     } catch (e) {
-      _showErrorFeedback(e.toString());
+      if (!mounted) return;
+      _showFeedback(isSuccess: false, message: '오류가 발생했습니다.');
     } finally {
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _overlayColor = Colors.white;
+          _overlayColor = Colors.white; // 다시 원래 색상으로
         });
       }
     }
   }
 
-  void _showSuccessFeedback(String name) {
+  // 상단 스낵바 피드백
+  void _showFeedback({required bool isSuccess, required String message}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: const Color(0xFF4CAF50),
+        backgroundColor: isSuccess ? const Color(0xFF4CAF50) : const Color(0xFFF44336),
         behavior: SnackBarBehavior.floating,
-        content: Text('✅ $name 학생 출석 완료', style: const TextStyle(fontWeight: FontWeight.bold)),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
-
-  void _showErrorFeedback(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFFF44336),
-        behavior: SnackBarBehavior.floating,
-        content: Text('❌ 오류: $message'),
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Row(
+          children: [
+            Icon(isSuccess ? Icons.check_circle : Icons.error, color: Colors.white),
+            const SizedBox(width: 12),
+            Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        duration: const Duration(milliseconds: 1500),
       ),
     );
   }
@@ -79,28 +82,27 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      // 앱바 디자인을 이전 화면들과 통일
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
         title: const Text('QR 출석 스캔', 
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
         children: [
+          // 1. QR 스캐너 본체
           MobileScanner(
+            controller: MobileScannerController(
+              detectionSpeed: DetectionSpeed.noDuplicates, // 자체 중복 감지 억제
+            ),
             onDetect: (capture) {
-              if (_isProcessing) return; // 처리 중이면 무시
+              if (_isProcessing) return;
 
               final List<Barcode> barcodes = capture.barcodes;
               for (final barcode in barcodes) {
                 final rawValue = barcode.rawValue;
-                if (rawValue == null) continue;
-
-                // 유효성 검사 로직 간소화
-                if (rawValue.contains('UID:') && rawValue.contains('NAME:')) {
+                if (rawValue != null && rawValue.contains('UID:') && rawValue.contains('NAME:')) {
                   _saveAttendance(rawValue);
                   break;
                 }
@@ -108,10 +110,10 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
             },
           ),
           
-          // QR 가이드 UI (중앙 박스)
+          // 2. 스캔 가이드 Overlay
           _buildScannerOverlay(),
 
-          // 하단 안내 텍스트
+          // 3. 하단 안내 문구
           _buildBottomInstruction(),
         ],
       ),
@@ -125,29 +127,26 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
         children: [
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            width: 250,
-            height: 250,
+            width: 260,
+            height: 260,
             decoration: BoxDecoration(
-              border: Border.all(
-                color: _overlayColor,
-                width: 4,
-              ),
-              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: _overlayColor, width: 4),
+              borderRadius: BorderRadius.circular(40),
             ),
             child: _isProcessing 
-              ? const Center(child: CircularProgressIndicator(color: Colors.white))
+              ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
               : null,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.black54,
+              color: Colors.black.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
-              '이 사각형 안에 QR 코드를 맞춰주세요',
-              style: TextStyle(color: Colors.white, fontSize: 14),
+              '사각형 안에 QR 코드를 비춰주세요',
+              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -157,17 +156,18 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
 
   Widget _buildBottomInstruction() {
     return Positioned(
-      bottom: 60,
+      bottom: 80,
       left: 0,
       right: 0,
       child: Column(
         children: const [
           Text(
-            '학생의 QR을 비추면',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
+            '학생 QR 스캔 시',
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
+          SizedBox(height: 6),
           Text(
-            '출석부가 자동으로 업데이트됩니다',
+            '출석부가 실시간으로 업데이트됩니다',
             style: TextStyle(color: Color(0xFFB0B8C1), fontSize: 15),
           ),
         ],
