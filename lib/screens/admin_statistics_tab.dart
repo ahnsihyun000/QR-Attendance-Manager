@@ -28,10 +28,10 @@ class AdminStatisticsTab extends StatelessWidget {
             );
           }
 
-          return FutureBuilder<DatabaseEvent>(
-            future: FirebaseDatabase.instance
+          return StreamBuilder<DatabaseEvent>(
+            stream: FirebaseDatabase.instance
                 .ref('attendance')
-                .once(),
+                .onValue,
             builder: (context, preSnapshot) {
               if (preSnapshot.connectionState ==
                   ConnectionState.waiting) {
