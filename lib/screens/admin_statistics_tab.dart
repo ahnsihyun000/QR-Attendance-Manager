@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:firebase_database/firebase_database.dart';
 
-class AdminStatisticsTab extends StatelessWidget {
+class AdminStatisticsTab extends StatefulWidget {
   const AdminStatisticsTab({super.key});
+
+  @override
+  State<AdminStatisticsTab> createState() => _AdminStatisticsTabState();
+}
+
+class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
+  // 처음 선택될 기본값
+  String _selectedEventId = 'event01';
 
   static const Color _tossBlue = Color(0xFF3182F6);
   static const Color _tossRed = Color(0xFFFF6B6B);
@@ -16,195 +23,192 @@ class AdminStatisticsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _tossBg,
+      // 키보드 오버플로우 방지
+      resizeToAvoidBottomInset: false,
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('attendance')
-            .snapshots(),
-        builder: (context, attendanceSnapshot) {
-          if (attendanceSnapshot.connectionState ==
-              ConnectionState.waiting) {
+        stream: FirebaseFirestore.instance.collection('attendance').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(color: _tossBlue),
             );
           }
 
-          return StreamBuilder<DatabaseEvent>(
-            stream: FirebaseDatabase.instance
-                .ref('attendance')
-                .onValue,
-            builder: (context, preSnapshot) {
-              if (preSnapshot.connectionState ==
-                  ConnectionState.waiting) {
-                return const Center(
-                  child: CircularProgressIndicator(color: _tossBlue),
-                );
-              }
+          final allDocs = snapshot.data?.docs ?? [];
 
-              final attendanceDocs =
-                  attendanceSnapshot.data?.docs ?? [];
+          // 1. 모든 문서에서 중복 없이 행사 ID(eventId) 목록 추출
+          Set<String> eventIdSet = {};
+          for (var doc in allDocs) {
+            final data = doc.data() as Map<String, dynamic>;
+            if (data['eventId'] != null) {
+              eventIdSet.add(data['eventId']);
+            }
+          }
 
-              final dataSnapshot = preSnapshot.data?.snapshot;
+          // 만약 데이터가 하나도 없다면 기본값 유지
+          List<String> eventIds = eventIdSet.toList()..sort();
+          if (eventIds.isEmpty) eventIds.add('event01');
 
-              final registeredStudents = <String>{};
+          // 현재 선택된 값이 목록에 없다면 첫 번째 항목으로 자동 변경
+          if (!eventIds.contains(_selectedEventId)) {
+            _selectedEventId = eventIds.first;
+          }
 
-              for (var child in dataSnapshot?.children ?? []) {
-                final value = child.value as Map?;
+          // 2. 선택된 행사 ID에 해당하는 데이터만 필터링
+          final filteredDocs = allDocs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['eventId'] == _selectedEventId;
+          }).toList();
 
-                if (value != null && value['studentId'] != null) {
-                  registeredStudents.add(
-                    value['studentId'].toString(),
-                  );
-                }
-              }
+          int attendedCount = 0;
+          int missingCount = 0;
 
-              final attendedStudents = <String>{};
+          for (var doc in filteredDocs) {
+            final data = doc.data() as Map<String, dynamic>;
+            if (data['status'] == '출석 완료') {
+              attendedCount++;
+            } else {
+              missingCount++;
+            }
+          }
 
-              for (var doc in attendanceDocs) {
-                final data = doc.data() as Map<String, dynamic>;
+          int total = attendedCount + missingCount;
+          double attendPercent = total == 0 ? 0 : (attendedCount / total) * 100;
 
-                final studentId = data['uid']?.toString();
-
-                if (studentId != null &&
-                    registeredStudents.contains(studentId)) {
-                  attendedStudents.add(studentId);
-                }
-              }
-
-              final attendedCount = attendedStudents.length;
-
-              final totalCount = registeredStudents.length;
-
-              
-
-              final absentCount =
-                  (totalCount - attendedCount).clamp(0, totalCount);
-
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 20),
-                    const Text(
-                      '출석 통계',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: _tossBlack,
-                      ),
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "출석 통계",
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: _tossBlack,
                     ),
-                    const SizedBox(height: 24),
+                  ),
+                  const SizedBox(height: 20),
 
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            height: 260,
-                            child: PieChart(
-                              PieChartData(
-                                sectionsSpace: 3,
-                                centerSpaceRadius: 60,
-                                sections: [
-                                  PieChartSectionData(
-                                    color: _tossBlue,
-                                    value: attendedCount.toDouble(),
-                                    title: totalCount == 0
-                                        ? '0%'
-                                        : '${((attendedCount / totalCount) * 100).toStringAsFixed(1)}%',
-                                    radius: 90,
-                                    titleStyle: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  PieChartSectionData(
-                                    color: _tossRed,
-                                    value: absentCount.toDouble(),
-                                    title: totalCount == 0
-                                        ? '0%'
-                                        : '${((absentCount / totalCount) * 100).toStringAsFixed(1)}%',
-                                    radius: 90,
-                                    titleStyle: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                  // ✨ [업그레이드] 드롭다운 선택창
+                  _buildEventDropdown(eventIds),
 
-                          const SizedBox(height: 30),
+                  const SizedBox(height: 30),
 
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _buildInfoCard(
-                                title: '참석',
-                                count: attendedCount,
+                  // 차트 영역 (기존과 동일)
+                  Container(
+                    height: 240,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: Stack(
+                      children: [
+                        PieChart(
+                          PieChartData(
+                            sectionsSpace: 0,
+                            centerSpaceRadius: 70,
+                            sections: [
+                              PieChartSectionData(
                                 color: _tossBlue,
+                                value: attendedCount.toDouble(),
+                                radius: 25,
+                                showTitle: false,
                               ),
-                              _buildInfoCard(
-                                title: '불참석',
-                                count: absentCount,
-                                color: _tossRed,
+                              PieChartSectionData(
+                                color: _tossRed.withOpacity(0.2),
+                                value: missingCount.toDouble(),
+                                radius: 25,
+                                showTitle: false,
                               ),
                             ],
                           ),
-
-                          const SizedBox(height: 24),
-
-                          Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  '전체 신청 인원',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: _tossGrey,
-                                  ),
+                        ),
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${attendPercent.toStringAsFixed(1)}%',
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: _tossBlue,
                                 ),
-                                Text(
-                                  '$totalCount명',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: _tossBlack,
-                                  ),
+                              ),
+                              const Text(
+                                '출석률',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: _tossGrey,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              );
-            },
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildInfoCard(
+                        title: "출석 인원",
+                        count: attendedCount,
+                        color: _tossBlue,
+                      ),
+                      _buildInfoCard(
+                        title: "미출석 인원",
+                        count: missingCount,
+                        color: _tossRed,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           );
         },
+      ),
+    );
+  }
+
+  // ✨ 드롭다운 위젯 빌더
+  Widget _buildEventDropdown(List<String> eventIds) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+        ],
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedEventId,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _tossBlue),
+          items: eventIds.map((String id) {
+            return DropdownMenuItem<String>(
+              value: id,
+              child: Text(
+                id,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: _tossBlack,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() => _selectedEventId = newValue);
+            }
+          },
+        ),
       ),
     );
   }
@@ -215,37 +219,22 @@ class AdminStatisticsTab extends StatelessWidget {
     required Color color,
   }) {
     return Container(
-      width: 130,
-      padding: const EdgeInsets.symmetric(vertical: 18),
+      width: MediaQuery.of(context).size.width * 0.42,
+      padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         children: [
-          Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              color: _tossGrey,
-            ),
-          ),
-          const SizedBox(height: 6),
+          Text(title, style: const TextStyle(fontSize: 15, color: _tossGrey)),
+          const SizedBox(height: 8),
           Text(
             '$count명',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: _tossBlack,
+              color: color,
             ),
           ),
         ],

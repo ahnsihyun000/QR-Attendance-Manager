@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class PreRegistrationScreen extends StatefulWidget {
@@ -10,8 +9,9 @@ class PreRegistrationScreen extends StatefulWidget {
 }
 
 class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
-  final DatabaseReference _realtimeDb = FirebaseDatabase.instance.ref("attendance");
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _eventIdController = TextEditingController(text: 'event01');
+  String _selectedEventId = 'event01';
 
   // 스타일 상수
   static const _tossBlue = Color(0xFF3182F6);
@@ -21,41 +21,48 @@ class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
   static const _tossBg = Color(0xFFF2F4F6);
   static const _tossBlack = Color(0xFF191F28);
 
+  @override
+  void dispose() {
+    _eventIdController.dispose();
+    super.dispose();
+  }
+
+  void _applyEventFilter() {
+    final eventId = _eventIdController.text.trim();
+    if (eventId.isEmpty || eventId.contains('/')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("올바른 행사 ID를 입력해주세요.")),
+      );
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() => _selectedEventId = eventId);
+  }
+
   // 데이터 로드 로직
   Future<List<Map<String, dynamic>>> _loadApplicants() async {
-    // 1. Realtime DB(신청자)와 Firestore(출석자) 동시 호출
-    final results = await Future.wait([
-      _realtimeDb.get(),
-      _firestore.collection('attendance').get(),
-    ]);
-
-    final DataSnapshot realtimeSnapshot = results[0] as DataSnapshot;
-    final QuerySnapshot firestoreSnapshot = results[1] as QuerySnapshot;
-
-    // 2. 출석 완료자 UID 세트 생성 (중복 제거 및 빠른 검색용)
-    final Set<String> attendedUids = firestoreSnapshot.docs
-        .map((doc) => "${(doc.data() as Map)['uid']}".trim())
-        .where((uid) => uid.isNotEmpty)
-        .toSet();
-
-    // 3. 신청자 명단 파싱 및 출석 대조
+    final snapshot = await _firestore
+        .collection('attendance')
+        .where('eventId', isEqualTo: _selectedEventId)
+        .get();
     final List<Map<String, dynamic>> applicantList = [];
-    
-    if (realtimeSnapshot.value != null) {
-      final Map<dynamic, dynamic> data = realtimeSnapshot.value as Map<dynamic, dynamic>;
-      
-      data.forEach((key, value) {
-        if (value is Map) {
-          final String uid = "${value['studentId']}".trim();
-          final String name = "${value['userName']}".trim();
-          final bool isAttend = attendedUids.contains(uid);
 
-          applicantList.add({
-            'uid': uid,
-            'name': name,
-            'isAttend': isAttend,
-          });
-        }
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final uid = '${data['studentId'] ?? data['uid'] ?? data['userUid'] ?? ''}'.trim();
+      final name = '${data['userName'] ?? data['name'] ?? ''}'.trim();
+      final status = '${data['status'] ?? '대기 중'}';
+
+      if (uid.isEmpty || name.isEmpty) {
+        continue;
+      }
+
+      applicantList.add({
+        'uid': uid,
+        'name': name,
+        'status': status,
+        'isAttend': status == '출석 완료',
       });
     }
 
@@ -84,37 +91,97 @@ class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
           setState(() {}); // 화면 갱신
         },
         color: _tossBlue,
-        child: FutureBuilder<List<Map<String, dynamic>>>(
-          future: _loadApplicants(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: _tossBlue));
-            }
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          children: [
+            _buildEventFilter(),
+            const SizedBox(height: 16),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _loadApplicants(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 120),
+                    child: Center(
+                      child: CircularProgressIndicator(color: _tossBlue),
+                    ),
+                  );
+                }
 
-            if (snapshot.hasError) {
-              return Center(
-                child: Text('데이터를 불러오지 못했습니다.\n네트워크를 확인해 주세요.', 
-                  textAlign: TextAlign.center, style: const TextStyle(color: _tossGreyText))
-              );
-            }
+                if (snapshot.hasError) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 120),
+                    child: Center(
+                      child: Text(
+                        '데이터를 불러오지 못했습니다.\n네트워크를 확인해 주세요.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: _tossGreyText),
+                      ),
+                    ),
+                  );
+                }
 
-            final data = snapshot.data ?? [];
-            if (data.isEmpty) {
-              return const Center(
-                child: Text('신청한 학생이 없습니다.', 
-                  style: TextStyle(color: _tossGreyText, fontSize: 16))
-              );
-            }
+                final data = snapshot.data ?? [];
+                if (data.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 120),
+                    child: Center(
+                      child: Text(
+                        '신청한 학생이 없습니다.',
+                        style: TextStyle(color: _tossGreyText, fontSize: 16),
+                      ),
+                    ),
+                  );
+                }
 
-            return ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(), // RefreshIndicator를 위해 필요
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              itemCount: data.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => _buildApplicantItem(data[index]),
-            );
-          },
+                return Column(
+                  children: [
+                    for (final item in data) ...[
+                      _buildApplicantItem(item),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEventFilter() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: _tossBg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.event_available_rounded, color: _tossBlue),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: _eventIdController,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _applyEventFilter(),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                hintText: "행사 ID",
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _applyEventFilter,
+            child: const Text(
+              "조회",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }

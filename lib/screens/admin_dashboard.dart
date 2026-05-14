@@ -5,6 +5,7 @@ import 'admin_login.dart';
 import 'admin_qr_camera_tab.dart';
 //정유림
 import 'admin_statistics_tab.dart';
+import 'bulk_attendance_upload_screen.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -148,6 +149,20 @@ class AdminHomeTab extends StatelessWidget {
                 iconColor: const Color(0xFF3182F6),
                 iconBgColor: const Color(0xFFE8F3FF),
                 onTap: () => onTabChange(1),
+              ),
+              _buildTossCard(
+                context,
+                title: "명단 업로드",
+                subtitle: "CSV/탭 붙여넣기",
+                icon: Icons.upload_file_rounded,
+                iconColor: const Color(0xFF00AD5C),
+                iconBgColor: const Color(0xFFE5F8EF),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BulkAttendanceUploadScreen(),
+                  ),
+                ),
               ),
             ],
           ),

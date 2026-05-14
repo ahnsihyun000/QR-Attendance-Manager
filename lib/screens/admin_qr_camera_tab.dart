@@ -10,12 +10,25 @@ class AdminQrCameraTab extends StatefulWidget {
 }
 
 class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
+  final _eventIdController = TextEditingController(text: 'event01');
   bool _isProcessing = false;
   Color _overlayColor = Colors.white;
+
+  @override
+  void dispose() {
+    _eventIdController.dispose();
+    super.dispose();
+  }
 
   // 출석 데이터 저장 로직
   Future<void> _saveAttendance(String rawValue) async {
     if (_isProcessing) return;
+
+    final eventId = _eventIdController.text.trim();
+    if (eventId.isEmpty || eventId.contains('/')) {
+      _showFeedback(isSuccess: false, message: '올바른 행사 ID를 입력해주세요.');
+      return;
+    }
 
     setState(() {
       _isProcessing = true;
@@ -31,20 +44,33 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
       final name = parts[1].replaceAll('NAME:', '').trim();
 
       if (uid.isEmpty || name.isEmpty) throw Exception('데이터가 비어있습니다.');
+      if (uid.contains('/')) throw Exception('학번 형식이 올바르지 않습니다.');
 
-      // 2. 파이어스토어 저장
-      await FirebaseFirestore.instance.collection('attendance').add({
-        'uid': uid,
-        'name': name,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      final result = await _markAttendance(
+        eventId: eventId,
+        studentId: uid,
+        name: name,
+      );
 
       if (!mounted) return;
-      _showFeedback(isSuccess: true, message: '$name 학생 출석 완료!');
 
-      // 3. 성공 시 2초간 대기 (중복 스캔 방지)
+      switch (result) {
+        case _AttendanceResult.success:
+          setState(() => _overlayColor = const Color(0xFF00AD5C));
+          _showFeedback(isSuccess: true, message: '$name 학생 출석 완료!');
+          break;
+        case _AttendanceResult.notRegistered:
+          setState(() => _overlayColor = const Color(0xFFF04452));
+          _showFeedback(isSuccess: false, message: '사전 명단에 없는 학생입니다.');
+          break;
+        case _AttendanceResult.alreadyChecked:
+          setState(() => _overlayColor = const Color(0xFFFF9800));
+          _showFeedback(isSuccess: false, message: '이미 출석 완료된 학생입니다.');
+          break;
+      }
+
+      // 3. 결과 표시 후 2초간 대기 (중복 스캔 방지)
       await Future.delayed(const Duration(seconds: 2));
-
     } catch (e) {
       if (!mounted) return;
       _showFeedback(isSuccess: false, message: '오류가 발생했습니다.');
@@ -56,6 +82,44 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
         });
       }
     }
+  }
+
+  Future<_AttendanceResult> _markAttendance({
+    required String eventId,
+    required String studentId,
+    required String name,
+  }) async {
+    final firestore = FirebaseFirestore.instance;
+    final docId = '${eventId}_$studentId';
+    final docRef = firestore.collection('attendance').doc(docId);
+
+    return firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+
+      if (!snapshot.exists) {
+        return _AttendanceResult.notRegistered;
+      }
+
+      final data = snapshot.data() as Map<String, dynamic>;
+      if (data['status'] == '출석 완료') {
+        return _AttendanceResult.alreadyChecked;
+      }
+
+      transaction.update(docRef, {
+        'status': '출석 완료',
+        'attendanceTime': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'checkedAt': FieldValue.serverTimestamp(),
+        'eventId': eventId,
+        'studentId': studentId,
+        'userUid': studentId,
+        'uid': studentId,
+        'userName': name,
+        'name': name,
+      });
+
+      return _AttendanceResult.success;
+    });
   }
 
   // 상단 스낵바 피드백
@@ -109,6 +173,8 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
               }
             },
           ),
+
+          _buildEventIdPanel(),
           
           // 2. 스캔 가이드 Overlay
           _buildScannerOverlay(),
@@ -116,6 +182,45 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
           // 3. 하단 안내 문구
           _buildBottomInstruction(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEventIdPanel() {
+    return Positioned(
+      top: 16,
+      left: 20,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.event_available_rounded, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _eventIdController,
+                enabled: !_isProcessing,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                cursorColor: Colors.white,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  hintText: '행사 ID',
+                  hintStyle: TextStyle(color: Color(0xFFB0B8C1)),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -174,4 +279,10 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
       ),
     );
   }
+}
+
+enum _AttendanceResult {
+  success,
+  notRegistered,
+  alreadyChecked,
 }
