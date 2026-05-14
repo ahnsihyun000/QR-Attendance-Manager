@@ -48,7 +48,7 @@ class AdminStatisticsTab extends StatelessWidget {
               final registeredStudents = <String>{};
 
               for (var child in dataSnapshot?.children ?? []) {
-                final value = child.value as Map?;
+                final value = child?.value as Map?;
 
                 if (value != null && value['studentId'] != null) {
                   registeredStudents.add(
@@ -252,4 +252,8 @@ class AdminStatisticsTab extends StatelessWidget {
       ),
     );
   }
+}
+
+extension on Object? {
+  Null get value => null;
 }
