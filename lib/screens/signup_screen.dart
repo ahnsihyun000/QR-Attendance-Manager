@@ -39,6 +39,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -48,7 +49,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
-      isScrollControlled: true, // 높이 조절 가능하게
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -91,42 +92,60 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // 회원가입 로직
+  // 회원가입 로직 (중복 가입 방지 보강)
   Future<void> _register() async {
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
     final String name = _nameController.text.trim();
 
+    // 1. 필수 입력값 확인
     if (id.isEmpty || pw.isEmpty || name.isEmpty || _selectedDept == null) {
       _showSnackBar("모든 정보를 입력해 주세요.");
+      return;
+    }
+
+    // 2. 학번 자리수 간단 체크 (필요시)
+    if (id.length < 5) {
+      _showSnackBar("유효한 학번을 입력해 주세요.");
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // 학번 중복 체크 (선택 사항)
+      // 3. 🔥 학번 중복 체크 (DB에 해당 문서가 이미 있는지 조회)
       final doc = await FirebaseFirestore.instance.collection('users').doc(id).get();
+      
       if (doc.exists) {
-        _showSnackBar("이미 가입된 학번입니다.");
-        return;
+        // 이미 가입된 경우 함수를 여기서 종료함
+        if (mounted) setState(() => _isLoading = false);
+        _showSnackBar("이미 가입된 학번입니다. 로그인해 주세요.");
+        return; 
       }
 
+      // 4. 중복이 아니면 새로운 문서 생성
       await FirebaseFirestore.instance.collection('users').doc(id).set({
         'studentId': id,
         'password': pw,
         'name': name,
         'department': _selectedDept,
         'createdAt': FieldValue.serverTimestamp(),
+        'lastDeviceId': '', // 중복 로그인 방지 기능을 위한 필드 미리 생성
       });
 
       if (!mounted) return;
       _showSnackBar("가입을 축하합니다! 🎉");
-      Navigator.pop(context); // 로그인 화면으로 이동
+      
+      // 잠시 후 로그인 화면으로 이동
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) Navigator.pop(context);
+      });
+
     } catch (e) {
-      _showSnackBar("가입에 실패했습니다. 다시 시도해 주세요.");
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showSnackBar("네트워크 오류가 발생했습니다. 다시 시도해 주세요.");
+      }
     }
   }
 
@@ -164,7 +183,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               _buildInputField("이름", _nameController, "실명을 입력하세요"),
               const SizedBox(height: 24),
 
-              _buildInputField("학번", _idController, "학번 7자리를 입력하세요", keyboardType: TextInputType.number),
+              _buildInputField("학번", _idController, "학번을 입력하세요", keyboardType: TextInputType.number),
               const SizedBox(height: 24),
 
               _buildLabel("소속 학과"),
@@ -245,7 +264,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: _tossBlue,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: _tossBlue.withValues(alpha: 0.6),
+          disabledBackgroundColor: _tossBlue.withOpacity(0.6),
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -270,5 +289,5 @@ class _SignUpScreenState extends State<SignUpScreen> {
         borderSide: const BorderSide(color: _tossBlue, width: 1.5),
       ),
     );
-  }
+  } 
 }
