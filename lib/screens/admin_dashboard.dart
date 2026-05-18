@@ -3,6 +3,8 @@ import 'admin_attendance_list.dart';
 import 'pre_registration_list.dart'; 
 import 'admin_login.dart';
 import 'admin_qr_camera_tab.dart';
+//정유림
+import 'admin_statistics_tab.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -30,9 +32,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         AdminHomeTab(onTabChange: _changeTab),
         const AdminAttendanceList(),
         const AdminQrCameraTab(),
-        const Center(
-          child: Text("통계 화면 준비 중", style: TextStyle(color: _tossGreyText)),
-        ),
+        //정유림
+        const AdminStatisticsTab(),
       ];
 
   @override
