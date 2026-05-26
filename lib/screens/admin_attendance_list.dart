@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class AdminAttendanceList extends StatefulWidget {
   const AdminAttendanceList({super.key});
@@ -10,60 +11,13 @@ class AdminAttendanceList extends StatefulWidget {
 
 class _AdminAttendanceListState extends State<AdminAttendanceList> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final _eventIdController = TextEditingController(text: 'event01');
-  String _selectedEventId = 'event01';
 
-  // 스타일 상수 (Toss Style)
+  // 토스 스타일 상수 정의
   static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreen = Color(0xFF00AD5C);
   static const _tossGrey = Color(0xFF8B95A1);
   static const _tossBg = Color(0xFFF2F4F6);
   static const _tossBlack = Color(0xFF191F28);
-
-  @override
-  void dispose() {
-    _eventIdController.dispose();
-    super.dispose();
-  }
-
-  void _applyEventFilter() {
-    final eventId = _eventIdController.text.trim();
-    if (eventId.isEmpty || eventId.contains('/')) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("올바른 행사 ID를 입력해주세요.")));
-      return;
-    }
-
-    FocusScope.of(context).unfocus();
-    setState(() => _selectedEventId = eventId);
-  }
-
-  // 정렬 함수: QueryDocumentSnapshot 타입을 명시적으로 사용
-  int _sortAttendanceDocs(
-    QueryDocumentSnapshot<Map<String, dynamic>> a,
-    QueryDocumentSnapshot<Map<String, dynamic>> b,
-  ) {
-    final dataA = a.data();
-    final dataB = b.data();
-
-    // 1. 출석 완료 상태를 최상단으로 (상태 우선 정렬)
-    final String statusA = dataA['status'] ?? '대기 중';
-    final String statusB = dataB['status'] ?? '대기 중';
-
-    if (statusA == '출석 완료' && statusB != '출석 완료') return -1;
-    if (statusA != '출석 완료' && statusB == '출석 완료') return 1;
-
-    // 2. 같은 상태 내에서는 시간순 정렬 (최신순)
-    final Timestamp? timeA = dataA['attendanceTime'] as Timestamp?;
-    final Timestamp? timeB = dataB['attendanceTime'] as Timestamp?;
-
-    if (timeA == null && timeB == null) return 0;
-    if (timeA == null) return 1;
-    if (timeB == null) return -1;
-
-    return timeB.compareTo(timeA); // 최신 출석자가 위로
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +26,7 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
       appBar: AppBar(
         backgroundColor: _tossBg,
         elevation: 0,
+        scrolledUnderElevation: 0,
         title: const Text(
           "실시간 출석 명단",
           style: TextStyle(
@@ -82,87 +37,91 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
         ),
         centerTitle: true,
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        // Firestore에서 실시간 데이터 구독
-        stream: _firestore
-            .collection('attendance')
-            .where('eventId', isEqualTo: _selectedEventId)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(child: Text("데이터를 불러오는 중 오류가 발생했습니다."));
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: _tossBlue),
-            );
-          }
-
-          // 에러의 핵심이었던 부분: 명확한 타입 캐스팅 후 정렬
-          final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs =
-              List.from(snapshot.data!.docs);
-
-          docs.sort(_sortAttendanceDocs);
-
-          return Column(
-            children: [
-              _buildEventFilter(),
-              Expanded(
-                child: docs.isEmpty
-                    ? const Center(
-                        child: Text(
-                          "해당 행사 출석 데이터가 없습니다.",
-                          style: TextStyle(color: _tossGrey),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                        itemCount: docs.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          return _buildAttendanceListItem(docs[index]);
-                        },
-                      ),
+      body: Column(
+        children: [
+          _buildSummaryHeader(),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 20, 24, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '실시간 출석 현황',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333D4B),
+                ),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              // 🎯 실제 콘솔 구조에 맞춰 timestamp 내림차순(최신순) 정렬 쿼리 적용
+              stream: _firestore
+                  .collection('attendance')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(child: Text("데이터를 불러오는 중 오류가 발생했습니다."));
+                }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: _tossBlue),
+                  );
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+
+                if (docs.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                  itemCount: docs.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    return _buildAttendanceListItem(docs[index]);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildEventFilter() {
+  // 상단 총 출석 인원 요약 헤더 카드
+  Widget _buildSummaryHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.event_available_rounded, color: _tossBlue),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _eventIdController,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _applyEventFilter(),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  isDense: true,
-                  hintText: "행사 ID",
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: _applyEventFilter,
-              child: const Text(
-                "조회",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+            const SizedBox(height: 6),
+            StreamBuilder<QuerySnapshot>(
+              stream: _firestore.collection('attendance').snapshots(),
+              builder: (context, snapshot) {
+                final count = snapshot.data?.docs.length ?? 0;
+                return Text(
+                  '현재 총 $count명 출석되었습니다.',
+                  style: const TextStyle(
+                    color: _tossBlack,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -170,15 +129,50 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
     );
   }
 
-  // 각 학생의 출석 정보를 보여주는 카드 위젯
+  // 데이터가 없을 때 표시할 빈 UI 상태창
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.qr_code_scanner_rounded,
+              size: 48,
+              color: Color(0xFFD1D6DB),
+            ),
+            SizedBox(height: 12),
+            Text(
+              '아직 출석한 학생이 없습니다.\nQR 코드를 스캔하면 실시간으로 반영됩니다.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _tossGrey, fontSize: 14, height: 1.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🎯 실제 Firestore 문서 필드 기반으로 매칭한 출석 명단 리스트 카드 위젯
   Widget _buildAttendanceListItem(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
     final data = doc.data();
-    final String name = data['name'] ?? '이름 없음';
-    final String studentId = data['userUid'] ?? data['studentId'] ?? 'ID 없음';
-    final String status = data['status'] ?? '대기 중';
-    final bool isAttend = status == '출석 완료';
+    final String name = data['userName'] ?? '이름 없음';
+    final String studentId = data['studentId'] ?? '학번 없음';
+    final Timestamp? timestamp = data['timestamp'] as Timestamp?;
+
+    String formattedTime = '-';
+    if (timestamp != null) {
+      formattedTime = DateFormat('a hh:mm', 'ko_KR').format(timestamp.toDate());
+    }
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -189,11 +183,8 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: isAttend ? _tossGreen.withOpacity(0.1) : _tossBg,
-            child: Icon(
-              isAttend ? Icons.check_rounded : Icons.person_outline_rounded,
-              color: isAttend ? _tossGreen : _tossGrey,
-            ),
+            backgroundColor: _tossGreen.withValues(alpha: 0.1),
+            child: const Icon(Icons.check_rounded, color: _tossGreen),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -216,20 +207,37 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: isAttend ? _tossGreen.withOpacity(0.1) : _tossBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              status,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isAttend ? _tossGreen : _tossGrey,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: _tossGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  "출석 완료",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: _tossGreen,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 6),
+              Text(
+                formattedTime,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: _tossGrey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -117,7 +117,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                                 showTitle: false,
                               ),
                               PieChartSectionData(
-                                color: _tossRed.withOpacity(0.2),
+                                color: _tossRed.withValues(alpha: 0.2),
                                 value: missingCount.toDouble(),
                                 radius: 25,
                                 showTitle: false,
@@ -183,7 +183,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
       child: DropdownButtonHideUnderline(

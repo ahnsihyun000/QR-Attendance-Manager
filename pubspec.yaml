@@ -11,45 +11,53 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
-  # [추가] 날짜 및 시간 포맷팅 (출석 리스트용)
+  # 날짜 및 시간 포맷팅
   intl: ^0.20.2
 
-  # [정유림님] 신청자와 출석자 비교 및 QR 스캔
-  firebase_database: ^12.2.0
-  mobile_scanner: ^7.2.0
+  # Firebase 및 스캐너 관련
+  firebase_database: any
+  mobile_scanner: any
   permission_handler: ^12.0.1
-
-  # [김민겸님] Firebase 핵심 패키지
   firebase_core: ^4.6.0
   cloud_firestore: ^6.2.0
   firebase_auth: ^6.3.0
 
-  # [김민수님] 참여율 그래프용
+  # 그래프 및 기타 기능
   fl_chart: ^0.68.0
-
-  # [조태현님] 위치 및 오프라인 저장용/QR생성
   geolocator: ^12.0.0
   shared_preferences: ^2.2.3
   qr_flutter: ^4.1.0
+  http: ^1.6.0
+  # ✂️ flutter_local_notifications (알림 기능 제거 완료)
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   
-  # 스플래시 화면 설정
+  # ✨ 스플래시 화면 생성 도구
   flutter_native_splash: ^2.4.0
+  
+  # ✨ 앱 아이콘 생성 도구
+  flutter_launcher_icons: ^0.13.1
 
-# 스플래시 상세 설정
+# 🖼️ 스플래시 화면 상세 설정 (앱 실행 시 잠깐 나오는 화면)
 flutter_native_splash:
-  color: "#ffffff"
-  image: assets/images/school_logo.png
+  color: "#ffffff" # 배경색 (흰색)
+  image: assets/images/logo.png # 중앙 이미지 경로
   android_12:
-    image: assets/images/school_logo.png
-    color: "#ffffff" # 안드로이드 12용 배경색 명시
+    image: assets/images/logo.png
+    color: "#ffffff"
+
+# 📱 앱 아이콘 상세 설정 (휴대폰 홈 화면 아이콘)
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/school_logo.png
+    - assets/images/logo.png # ✨ 로고 파일 에셋 등록

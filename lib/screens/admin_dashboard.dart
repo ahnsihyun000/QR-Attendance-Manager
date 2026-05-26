@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'admin_attendance_list.dart';
-import 'pre_registration_list.dart'; 
 import 'admin_login.dart';
 import 'admin_qr_camera_tab.dart';
-//정유림
 import 'admin_statistics_tab.dart';
-import 'bulk_attendance_upload_screen.dart';
+import 'pre_registration_list.dart';
+import 'admin_attendance_list.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -16,38 +14,97 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _currentIndex = 0;
+  bool _isLoggingOut = false; 
 
-  // 스타일 상수 통합
   static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreyText = Color(0xFF8B95A1);
   static const _tossBg = Color(0xFFF2F4F6);
-  //static const _tossBlack = Color(0xFF191F28);
 
-  // 탭 전환 메서드
+  // 🎯 하단 탭바를 통해서도 접근할 수 있도록 기존 리스트 유지
+  List<Widget> get _pages => [
+        AdminHomeTab(
+          onTabChange: _changeTab,
+          onLogoutPress: () => _showLogoutDialog(context),
+        ),
+        const AdminAttendanceList(), 
+        (!_isLoggingOut && _currentIndex == 2) ? const AdminQrCameraTab() : const SizedBox.shrink(),
+        const AdminStatisticsTab(),
+      ];
+
   void _changeTab(int index) {
+    if (_isLoggingOut) return; 
     setState(() => _currentIndex = index);
   }
 
-  // 페이지 리스트를 getter로 관리
-  List<Widget> get _pages => [
-        AdminHomeTab(onTabChange: _changeTab),
-        const AdminAttendanceList(),
-        const AdminQrCameraTab(),
-        //정유림
-        const AdminStatisticsTab(),
-      ];
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, 
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "로그아웃",
+          style: TextStyle(color: Color(0xFF191F28), fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: const Text(
+          "로그아웃 하시겠습니까?",
+          style: TextStyle(color: Color(0xFF191F28), fontSize: 15),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext), 
+            child: const Text(
+              "취소", 
+              style: TextStyle(color: Color(0xFF8B95A1), fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext); 
+
+              setState(() {
+                _isLoggingOut = true;
+                _currentIndex = 0;
+              });
+
+              await Future.delayed(const Duration(milliseconds: 350));
+
+              if (!mounted) return;
+
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => const AdminLoginScreen(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) => child,
+                  ),
+                  (route) => false,
+                );
+              }
+            },
+            child: const Text(
+              "로그아웃", 
+              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // 시스템 뒤로가기 기본 동작 방지
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        
         if (_currentIndex != 0) {
-          _changeTab(0); // 다른 탭이면 홈으로 이동
+          _changeTab(0);
         } else {
-          // 홈 탭이면 로그아웃 유도 메시지
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("로그아웃 버튼을 이용해 주세요."),
@@ -61,7 +118,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: Scaffold(
         backgroundColor: _tossBg,
         body: SafeArea(
-          child: IndexedStack( // 탭 상태 유지를 위해 IndexedStack 사용
+          child: IndexedStack(
             index: _currentIndex,
             children: _pages,
           ),
@@ -78,7 +135,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05), 
             blurRadius: 10, 
-            offset: const Offset(0, -5)
+            offset: const Offset(0, -5),
           ),
         ],
       ),
@@ -103,22 +160,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 }
 
-// --- 홈 탭 클래스 ---
 class AdminHomeTab extends StatelessWidget {
   final Function(int) onTabChange;
+  final VoidCallback onLogoutPress;
 
-  const AdminHomeTab({super.key, required this.onTabChange});
+  const AdminHomeTab({
+    super.key, 
+    required this.onTabChange,
+    required this.onLogoutPress,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader(context),
+        _buildHeader(),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 24),
-          child: Text("무엇을 확인해 볼까요?",
-              style: TextStyle(color: Color(0xFF8B95A1), fontSize: 16, fontWeight: FontWeight.w500)),
+          child: Text(
+            "무엇을 확인해 볼까요?",
+            style: TextStyle(color: Color(0xFF8B95A1), fontSize: 16, fontWeight: FontWeight.w500),
+          ),
         ),
         const SizedBox(height: 24),
         Expanded(
@@ -136,33 +199,42 @@ class AdminHomeTab extends StatelessWidget {
                 icon: Icons.people_alt_rounded,
                 iconColor: const Color(0xFFFF9800),
                 iconBgColor: const Color(0xFFFFF3E0),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const PreRegistrationScreen()),
-                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PreRegistrationScreen(),
+                    ),
+                  );
+                },
               ),
+              // 🎯 [수정 핵심 영역] 실시간 출석 카드 클릭 시 슬라이딩 애니메이션 페이지 전환 구현
               _buildTossCard(
                 context,
                 title: "실시간 출석",
                 subtitle: "QR 현황",
                 icon: Icons.qr_code_scanner_rounded,
-                iconColor: const Color(0xFF3182F6),
+                iconColor: const Color(0xFF3182F6), 
                 iconBgColor: const Color(0xFFE8F3FF),
-                onTap: () => onTabChange(1),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminAttendanceList(), // 👈 부드럽게 새 화면으로 push 해줍니다.
+                    ),
+                  );
+                }, 
               ),
               _buildTossCard(
                 context,
-                title: "명단 업로드",
-                subtitle: "CSV/탭 붙여넣기",
-                icon: Icons.upload_file_rounded,
-                iconColor: const Color(0xFF00AD5C),
-                iconBgColor: const Color(0xFFE5F8EF),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BulkAttendanceUploadScreen(),
-                  ),
-                ),
+                title: "가입자 승인",
+                subtitle: "신규 승인 대기",
+                icon: Icons.person_add_alt_1_rounded,
+                iconColor: const Color(0xFF6B66FF),
+                iconBgColor: const Color(0xFFF0F0FF),
+                onTap: () {
+                  // TODO: 가입자 승인 페이지 생성 후 Navigator 연결
+                },
               ),
             ],
           ),
@@ -171,44 +243,19 @@ class AdminHomeTab extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 12, 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text("관리자 대시보드",
-              style: TextStyle(color: Color(0xFF191F28), fontSize: 24, fontWeight: FontWeight.w800)),
+          const Text(
+            "관리자 대시보드",
+            style: TextStyle(color: Color(0xFF191F28), fontSize: 24, fontWeight: FontWeight.w800),
+          ),
           IconButton(
-            onPressed: () => _showLogoutDialog(context),
+            onPressed: onLogoutPress, 
             icon: const Icon(Icons.logout_rounded, color: Color(0xFF8B95A1)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("로그아웃", style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text("인증 화면으로 돌아가시겠습니까?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context), 
-            child: const Text("취소", style: TextStyle(color: Color(0xFF8B95A1)))
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const AdminLoginScreen()),
-                (route) => false,
-              );
-            },
-            child: const Text("확인", style: TextStyle(color: Color(0xFF3182F6), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -229,7 +276,11 @@ class AdminHomeTab extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02), 
+            blurRadius: 10, 
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Material(
@@ -249,9 +300,15 @@ class AdminHomeTab extends StatelessWidget {
                   child: Icon(icon, size: 28, color: iconColor),
                 ),
                 const SizedBox(height: 16),
-                Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF191F28))),
+                Text(
+                  title, 
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF191F28)),
+                ),
                 const SizedBox(height: 4),
-                Text(subtitle, style: const TextStyle(fontSize: 13, color: Color(0xFF8B95A1))),
+                Text(
+                  subtitle, 
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF8B95A1)),
+                ),
               ],
             ),
           ),

@@ -10,235 +10,259 @@ class PreRegistrationScreen extends StatefulWidget {
 
 class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final _eventIdController = TextEditingController(text: 'event01');
-  String _selectedEventId = 'event01';
 
-  // 스타일 상수
+  // 토스 스타일 색상 에셋 동일 유지
   static const _tossBlue = Color(0xFF3182F6);
-  static const _tossRed = Color(0xFFF04452);
-  static const _tossGreen = Color(0xFF00AD5C);
   static const _tossGreyText = Color(0xFF8B95A1);
   static const _tossBg = Color(0xFFF2F4F6);
   static const _tossBlack = Color(0xFF191F28);
+  static const _cardBorder = Color(0xFFE5E8EB);
 
-  @override
-  void dispose() {
-    _eventIdController.dispose();
-    super.dispose();
-  }
-
-  void _applyEventFilter() {
-    final eventId = _eventIdController.text.trim();
-    if (eventId.isEmpty || eventId.contains('/')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("올바른 행사 ID를 입력해주세요.")),
-      );
-      return;
-    }
-
-    FocusScope.of(context).unfocus();
-    setState(() => _selectedEventId = eventId);
-  }
-
-  // 데이터 로드 로직
+  // 📂 파이어베이스 데이터 안전 로드 및 정렬 로직
   Future<List<Map<String, dynamic>>> _loadApplicants() async {
-    final snapshot = await _firestore
-        .collection('attendance')
-        .where('eventId', isEqualTo: _selectedEventId)
-        .get();
-    final List<Map<String, dynamic>> applicantList = [];
+    try {
+      final snapshot = await _firestore
+          .collection('pre-investigation list')
+          .get()
+          .timeout(const Duration(seconds: 5));
+          
+      final List<Map<String, dynamic>> applicantList = [];
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      final uid = '${data['studentId'] ?? data['uid'] ?? data['userUid'] ?? ''}'.trim();
-      final name = '${data['userName'] ?? data['name'] ?? ''}'.trim();
-      final status = '${data['status'] ?? '대기 중'}';
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        
+        final uid = data['studentId']?.toString().trim() ?? '';
+        final name = data['userName']?.toString().trim() ?? '';
+        final formTitle = data['department']?.toString().trim() ?? '행사 참여 명단';
 
-      if (uid.isEmpty || name.isEmpty) {
-        continue;
+        // ⏱️ 타임스탬프 파싱 및 포맷 최적화
+        String formattedTime = '';
+        DateTime rawDateTime = DateTime(1970); 
+        
+        final timestampData = data['timestamp'];
+        
+        if (timestampData != null) {
+          if (timestampData is Timestamp) {
+            rawDateTime = timestampData.toDate();
+          } else if (timestampData is String) {
+            rawDateTime = DateTime.tryParse(timestampData) ?? DateTime(1970);
+          }
+          
+          final month = rawDateTime.month.toString().padLeft(2, '0');
+          final day = rawDateTime.day.toString().padLeft(2, '0');
+          final hour = rawDateTime.hour.toString().padLeft(2, '0');
+          final minute = rawDateTime.minute.toString().padLeft(2, '0');
+          formattedTime = '$month월 $day일 $hour시 $minute분';
+        }
+
+        // 식별 데이터 안전 검증 후 추가
+        if (uid.isNotEmpty || name.isNotEmpty) {
+          applicantList.add({
+            'uid': uid.isEmpty ? "학번 누락" : uid,
+            'name': name.isEmpty ? "이름 없음" : name,
+            'time': formattedTime,
+            'formTitle': formTitle,
+            'rawDateTime': rawDateTime,
+          });
+        }
       }
 
-      applicantList.add({
-        'uid': uid,
-        'name': name,
-        'status': status,
-        'isAttend': status == '출석 완료',
-      });
-    }
+      // 최신 등록 날짜 순 정렬
+      applicantList.sort((a, b) => (b['rawDateTime'] as DateTime).compareTo(a['rawDateTime'] as DateTime));
+      return applicantList;
 
-    // 이름순 정렬
-    applicantList.sort((a, b) => a['name'].compareTo(b['name']));
-    return applicantList;
+    } catch (e) {
+      debugPrint("🚨 데이터 로드 중 예외 발생: $e");
+      return Future.error(e);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _tossBg, // 🎯 배경색 일치화 완료
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: _tossBg, // 🎯 실시간 출석 명단 화면과 동일하게 배경을 토스 그레이로 연장합니다.
         elevation: 0,
-        title: const Text('사전 신청 명단', 
-          style: TextStyle(color: _tossBlack, fontWeight: FontWeight.bold)),
+        scrolledUnderElevation: 0,
+        title: const Text(
+          '사전 신청 명단',
+          style: TextStyle(
+            color: _tossBlack,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: -0.4,
+          ),
+        ),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _tossBlack, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: RefreshIndicator( // 당겨서 새로고침 추가
+      body: RefreshIndicator(
         onRefresh: () async {
-          setState(() {}); // 화면 갱신
+          setState(() {});
         },
         color: _tossBlue,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          children: [
-            _buildEventFilter(),
-            const SizedBox(height: 16),
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: _loadApplicants(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 120),
-                    child: Center(
-                      child: CircularProgressIndicator(color: _tossBlue),
-                    ),
-                  );
-                }
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _loadApplicants(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: _tossBlue, strokeWidth: 3),
+              );
+            }
 
-                if (snapshot.hasError) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 120),
-                    child: Center(
+            if (snapshot.hasError) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          '데이터를 불러오지 못했습니다.\n네트워크 상태나 관리자 권한을 확인해 주세요.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _tossGreyText, fontWeight: FontWeight.w500, height: 1.5, fontSize: 15),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            final data = snapshot.data ?? [];
+           
+            if (data.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: const Center(
                       child: Text(
-                        '데이터를 불러오지 못했습니다.\n네트워크를 확인해 주세요.',
+                        '사전 신청 내역이 비어 있습니다.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: _tossGreyText),
+                        style: TextStyle(color: _tossGreyText, fontSize: 16, fontWeight: FontWeight.w500),
                       ),
                     ),
-                  );
-                }
+                  ),
+                ],
+              );
+            }
 
-                final data = snapshot.data ?? [];
-                if (data.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 120),
-                    child: Center(
-                      child: Text(
-                        '신청한 학생이 없습니다.',
-                        style: TextStyle(color: _tossGreyText, fontSize: 16),
-                      ),
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    for (final item in data) ...[
-                      _buildApplicantItem(item),
-                      const SizedBox(height: 12),
-                    ],
-                  ],
-                );
+            return ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 40), // 앱바와의 간격 최적화
+              itemCount: data.length,
+              itemBuilder: (context, index) {
+                final item = data[index];
+                return _buildApplicantItem(item);
               },
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildEventFilter() {
+  // 👤 커스텀 리스트 타일 컴포넌트
+  Widget _buildApplicantItem(Map<String, dynamic> item) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _tossBg,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.event_available_rounded, color: _tossBlue),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextField(
-              controller: _eventIdController,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _applyEventFilter(),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                isDense: true,
-                hintText: "행사 ID",
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: _applyEventFilter,
-            child: const Text(
-              "조회",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+        color: Colors.white, // 카드 본체는 흰색으로 유지하여 배경과 완벽하게 대비되게 처리
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _cardBorder, width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.015), // 구버전/신버전 호환용 호환성 확보
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildApplicantItem(Map<String, dynamic> item) {
-    final bool isAttend = item['isAttend'];
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _tossBg,
-        borderRadius: BorderRadius.circular(20),
-      ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 상태 아이콘 (버전 호환성을 위해 withOpacity 사용)
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isAttend ? _tossGreen.withValues(alpha: 0.1) : _tossRed.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isAttend ? Icons.check_circle_rounded : Icons.access_time_filled_rounded,
-              color: isAttend ? _tossGreen : _tossRed,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          // 학생 정보
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item['name'], 
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _tossBlack)),
-                const SizedBox(height: 4),
-                Text('학번: ${item['uid']}', 
-                  style: const TextStyle(fontSize: 13, color: _tossGreyText)),
-              ],
-            ),
-          ),
-          // 상태 라벨
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: isAttend ? _tossGreen.withValues(alpha: 0.1) : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              isAttend ? '참석 완료' : '미출석',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: isAttend ? _tossGreen : _tossRed,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item['name'], 
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: _tossBlack,
+                  letterSpacing: -0.5,
+                ),
               ),
-            ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.badge_rounded, size: 14, color: _tossGreyText),
+                  const SizedBox(width: 5),
+                  Text(
+                    '학번: ${item['uid']}', // 실시간 출석 명단 폼인 '학번: XXXXX' 스타일과 포맷 일치
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _tossGreyText,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item['formTitle'],
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: _tossGreyText,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F3FF), // 실시간 출석 완료 뱃지 스타일처럼 강조 배경 추가
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  '신청 완료',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: _tossBlue,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (item['time'].toString().isNotEmpty)
+                Text(
+                  item['time'],
+                  style: const TextStyle(
+                    color: _tossGreyText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+            ],
           ),
         ],
       ),

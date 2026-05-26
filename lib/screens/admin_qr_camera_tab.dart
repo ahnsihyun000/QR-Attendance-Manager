@@ -10,134 +10,95 @@ class AdminQrCameraTab extends StatefulWidget {
 }
 
 class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
-  final _eventIdController = TextEditingController(text: 'event01');
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final MobileScannerController _scannerController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.normal,
+    facing: CameraFacing.back,
+  );
+
   bool _isProcessing = false;
-  Color _overlayColor = Colors.white;
+
+  // 토스 스타일 상수 정의
+  static const _tossBlue = Color(0xFF3182F6);
+  static const _tossGreen = Color(0xFF00AD5C);
+  static const _tossBlack = Color(0xFF191F28);
+  static const _tossGrey = Color(0xFF8B95A1);
 
   @override
   void dispose() {
-    _eventIdController.dispose();
+    _scannerController.dispose();
     super.dispose();
   }
 
-  // 출석 데이터 저장 로직
-  Future<void> _saveAttendance(String rawValue) async {
+  // QR 데이터 파싱 및 Firestore 업로드 처리 함수
+  Future<void> _handleQrDetection(String qrRawValue) async {
     if (_isProcessing) return;
-
-    final eventId = _eventIdController.text.trim();
-    if (eventId.isEmpty || eventId.contains('/')) {
-      _showFeedback(isSuccess: false, message: '올바른 행사 ID를 입력해주세요.');
-      return;
-    }
 
     setState(() {
       _isProcessing = true;
-      _overlayColor = const Color(0xFF3182F6); // 토스 블루색으로 피드백
     });
 
     try {
-      // 1. QR 데이터 파싱 (형식: UID:12345,NAME:홍길동)
-      final parts = rawValue.split(',');
-      if (parts.length < 2) throw Exception('유효하지 않은 QR 형식입니다.');
+      // 데이터 예시 규격이 "학번,이름" 형태이거나 단일 학번 형태일 때를 유연하게 대응합니다.
+      String studentId = qrRawValue.trim();
+      String userName = "확인된 학생";
 
-      final uid = parts[0].replaceAll('UID:', '').trim();
-      final name = parts[1].replaceAll('NAME:', '').trim();
-
-      if (uid.isEmpty || name.isEmpty) throw Exception('데이터가 비어있습니다.');
-      if (uid.contains('/')) throw Exception('학번 형식이 올바르지 않습니다.');
-
-      final result = await _markAttendance(
-        eventId: eventId,
-        studentId: uid,
-        name: name,
-      );
-
-      if (!mounted) return;
-
-      switch (result) {
-        case _AttendanceResult.success:
-          setState(() => _overlayColor = const Color(0xFF00AD5C));
-          _showFeedback(isSuccess: true, message: '$name 학생 출석 완료!');
-          break;
-        case _AttendanceResult.notRegistered:
-          setState(() => _overlayColor = const Color(0xFFF04452));
-          _showFeedback(isSuccess: false, message: '사전 명단에 없는 학생입니다.');
-          break;
-        case _AttendanceResult.alreadyChecked:
-          setState(() => _overlayColor = const Color(0xFFFF9800));
-          _showFeedback(isSuccess: false, message: '이미 출석 완료된 학생입니다.');
-          break;
+      if (qrRawValue.contains(',')) {
+        final parts = qrRawValue.split(',');
+        studentId = parts[0].trim();
+        userName = parts[1].trim();
       }
 
-      // 3. 결과 표시 후 2초간 대기 (중복 스캔 방지)
+      if (studentId.isEmpty) {
+        throw Exception("유효하지 않은 QR 코드 데이터입니다.");
+      }
+
+      // 🎯 [중요] Firestore 실제 문서 형식에 맞춰 3가지 핵심 필드만 생성하여 업로드
+      await _firestore.collection('attendance').add({
+        'studentId': studentId,
+        'userName': userName,
+        'timestamp': FieldValue.serverTimestamp(), // 서버 표준 시간 입력
+      });
+
+      if (!mounted) return;
+      _showResultSnackBar(context, "$userName($studentId) 출석 처리 완료", isSuccess: true);
+
+      // 연속 스캔을 위한 짧은 딜레이 대기
       await Future.delayed(const Duration(seconds: 2));
     } catch (e) {
       if (!mounted) return;
-      _showFeedback(isSuccess: false, message: '오류가 발생했습니다.');
+      _showResultSnackBar(context, "오류가 발생했습니다: ${e.toString()}", isSuccess: false);
     } finally {
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _overlayColor = Colors.white; // 다시 원래 색상으로
         });
       }
     }
   }
 
-  Future<_AttendanceResult> _markAttendance({
-    required String eventId,
-    required String studentId,
-    required String name,
-  }) async {
-    final firestore = FirebaseFirestore.instance;
-    final docId = '${eventId}_$studentId';
-    final docRef = firestore.collection('attendance').doc(docId);
-
-    return firestore.runTransaction((transaction) async {
-      final snapshot = await transaction.get(docRef);
-
-      if (!snapshot.exists) {
-        return _AttendanceResult.notRegistered;
-      }
-
-      final data = snapshot.data() as Map<String, dynamic>;
-      if (data['status'] == '출석 완료') {
-        return _AttendanceResult.alreadyChecked;
-      }
-
-      transaction.update(docRef, {
-        'status': '출석 완료',
-        'attendanceTime': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'checkedAt': FieldValue.serverTimestamp(),
-        'eventId': eventId,
-        'studentId': studentId,
-        'userUid': studentId,
-        'uid': studentId,
-        'userName': name,
-        'name': name,
-      });
-
-      return _AttendanceResult.success;
-    });
-  }
-
-  // 상단 스낵바 피드백
-  void _showFeedback({required bool isSuccess, required String message}) {
+  void _showResultSnackBar(BuildContext context, String message, {required bool isSuccess}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: isSuccess ? const Color(0xFF4CAF50) : const Color(0xFFF44336),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         content: Row(
           children: [
-            Icon(isSuccess ? Icons.check_circle : Icons.error, color: Colors.white),
-            const SizedBox(width: 12),
-            Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Icon(
+              isSuccess ? Icons.check_circle_rounded : Icons.error_rounded,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
-        duration: const Duration(milliseconds: 1500),
+        backgroundColor: isSuccess ? _tossGreen : Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -145,144 +106,106 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFFF2F4F6),
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFFF2F4F6),
         elevation: 0,
-        title: const Text('QR 출석 스캔', 
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        scrolledUnderElevation: 0,
+        title: const Text(
+          "출석 QR 스캔",
+          style: TextStyle(color: _tossBlack, fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          // 1. QR 스캐너 본체
-          MobileScanner(
-            controller: MobileScannerController(
-              detectionSpeed: DetectionSpeed.noDuplicates, // 자체 중복 감지 억제
-            ),
-            onDetect: (capture) {
-              if (_isProcessing) return;
-
-              final List<Barcode> barcodes = capture.barcodes;
-              for (final barcode in barcodes) {
-                final rawValue = barcode.rawValue;
-                if (rawValue != null && rawValue.contains('UID:') && rawValue.contains('NAME:')) {
-                  _saveAttendance(rawValue);
-                  break;
-                }
-              }
-            },
-          ),
-
-          _buildEventIdPanel(),
-          
-          // 2. 스캔 가이드 Overlay
-          _buildScannerOverlay(),
-
-          // 3. 하단 안내 문구
-          _buildBottomInstruction(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEventIdPanel() {
-    return Positioned(
-      top: 16,
-      left: 20,
-      right: 20,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.event_available_rounded, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _eventIdController,
-                enabled: !_isProcessing,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          child: Column(
+            children: [
+              const Text(
+                "학생들의 출석 QR 코드를 카메라 중앙에 맞춰주세요.",
+                style: TextStyle(color: _tossGrey, fontSize: 14, fontWeight: FontWeight.w500),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              // 🎯 에러가 발생하던 파라미터 구문을 패키지 표준 규격에 맞게 안전하게 변경
+              Container(
+                height: MediaQuery.of(context).size.width * 0.85,
+                width: MediaQuery.of(context).size.width * 0.85,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    )
+                  ],
                 ),
-                cursorColor: Colors.white,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  hintText: '행사 ID',
-                  hintStyle: TextStyle(color: Color(0xFFB0B8C1)),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Stack(
+                    children: [
+                      MobileScanner(
+                        controller: _scannerController,
+                        onDetect: (capture) {
+                          final List<Barcode> barcodes = capture.barcodes;
+                          for (final barcode in barcodes) {
+                            if (barcode.rawValue != null) {
+                              _handleQrDetection(barcode.rawValue!);
+                              break;
+                            }
+                          }
+                        },
+                      ),
+                      // 처리 중일 때 화면을 흐리게 덮어주는 오버레이 효과
+                      if (_isProcessing)
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          child: const Center(
+                            child: CircularProgressIndicator(color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 32),
+              _buildGuideCard(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildScannerOverlay() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: 260,
-            height: 260,
-            decoration: BoxDecoration(
-              border: Border.all(color: _overlayColor, width: 4),
-              borderRadius: BorderRadius.circular(40),
-            ),
-            child: _isProcessing 
-              ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-              : null,
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              '사각형 안에 QR 코드를 비춰주세요',
-              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
+  Widget _buildGuideCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
       ),
-    );
-  }
-
-  Widget _buildBottomInstruction() {
-    return Positioned(
-      bottom: 80,
-      left: 0,
-      right: 0,
-      child: Column(
-        children: const [
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            '학생 QR 스캔 시',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            "💡 스캔 가이드",
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _tossBlack),
+          ),
+          SizedBox(height: 10),
+          Text(
+            "• 인식 완료 시 하단 알림창과 함께 자동으로 실시간 출석 명단에 등록됩니다.",
+            style: TextStyle(fontSize: 13, color: _tossGrey, height: 1.5),
           ),
           SizedBox(height: 6),
           Text(
-            '출석부가 실시간으로 업데이트됩니다',
-            style: TextStyle(color: Color(0xFFB0B8C1), fontSize: 15),
+            "• 인식이 잘 안 될 경우 스마트폰 화면의 밝기를 키우거나 카메라 거리를 조절해 주세요.",
+            style: TextStyle(fontSize: 13, color: _tossGrey, height: 1.5),
           ),
         ],
       ),
     );
   }
-}
-
-enum _AttendanceResult {
-  success,
-  notRegistered,
-  alreadyChecked,
 }

@@ -5,16 +5,22 @@ import 'screens/login_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
+  // 1. 플러터 엔진 초기화 보장
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 2. Firebase 초기화와 함께 날짜 포맷 데이터도 초기화합니다
-  await Future.wait([
-    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
-    initializeDateFormatting('ko_KR', null), // 한국어 날짜 데이터 로드
-  ]);
 
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: LoginScreen(), 
-  ));
+  try {
+    // 2. 파이어베이스 먼저 확실하게 초기화 완료하기
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // 3. 날짜 포맷 초기화 완료하기
+    await initializeDateFormatting('ko_KR', null);
+  } catch (e) {
+    debugPrint("⚠️ 초기화 중 에러 발생: $e");
+  }
+
+  runApp(
+    const MaterialApp(debugShowCheckedModeBanner: false, home: LoginScreen()),
+  );
 }

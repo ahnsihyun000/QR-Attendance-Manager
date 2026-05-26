@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../constants.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -13,7 +12,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _idController = TextEditingController();
   final _pwController = TextEditingController();
   final _nameController = TextEditingController();
-  String? _selectedDept;
   bool _isLoading = false;
 
   // 스타일 상수 (Toss Style)
@@ -32,62 +30,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return; // 화면이 사라진 상태에서 스낵바 호출 방지
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
         backgroundColor: const Color(0xFF333D4B),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-    );
-  }
-
-  // 학과 선택 모달
-  void _showDeptPicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true, // 높이 조절 가능하게
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          maxChildSize: 0.8,
-          expand: false,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                const SizedBox(height: 12),
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: _tossGreyBg, borderRadius: BorderRadius.circular(2))),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Text("학과를 선택해 주세요", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _tossTextPrimary)),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: AppConstants.departments.length,
-                    itemBuilder: (context, index) {
-                      final dept = AppConstants.departments[index];
-                      return ListTile(
-                        title: Text(dept, style: const TextStyle(fontSize: 16, color: _tossTextPrimary)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                        onTap: () {
-                          setState(() => _selectedDept = dept);
-                          Navigator.pop(context);
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 
@@ -97,7 +51,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final String pw = _pwController.text.trim();
     final String name = _nameController.text.trim();
 
-    if (id.isEmpty || pw.isEmpty || name.isEmpty || _selectedDept == null) {
+    if (id.isEmpty || pw.isEmpty || name.isEmpty) {
       _showSnackBar("모든 정보를 입력해 주세요.");
       return;
     }
@@ -105,18 +59,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 학번 중복 체크 (선택 사항)
-      final doc = await FirebaseFirestore.instance.collection('users').doc(id).get();
+      // 1. ✨ [가장 안전한 방법] 고유한 값인 학번(Document ID)으로 중복 가입 여부 확인
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(id)
+          .get();
+
       if (doc.exists) {
-        _showSnackBar("이미 가입된 학번입니다.");
-        return;
+        _showSnackBar("이미 가입된 학생입니다.");
+        return; // finally 블록에서 로딩 상태가 자동으로 해제됩니다.
       }
 
-      await FirebaseFirestore.instance.collection('users').doc(id).set({
+      // 2. 중복된 학번이 없다면 신규 회원 정보 Firestore에 저장
+      // 문자열 안에서 $id와 $name을 사용하고 사이에 공백을 한 칸 둡니다.
+      String docId = '$id $name';
+
+      await FirebaseFirestore.instance.collection('users').doc(docId).set({
         'studentId': id,
         'password': pw,
         'name': name,
-        'department': _selectedDept,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -126,57 +87,73 @@ class _SignUpScreenState extends State<SignUpScreen> {
     } catch (e) {
       _showSnackBar("가입에 실패했습니다. 다시 시도해 주세요.");
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      // 가입 성공, 중복 차단, 통신 에러 등 어떤 경로로 종료되든 로딩 애니메이션 안전하게 해제
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _tossTextPrimary, size: 20),
-          onPressed: () => Navigator.pop(context),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: _tossTextPrimary,
+              size: 20,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 10),
-              const Text(
-                "새로운 시작,\n정보를 입력해 주세요",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: _tossTextPrimary,
-                  height: 1.4,
-                  letterSpacing: -0.5,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 10),
+                const Text(
+                  "새로운 시작,\n정보를 입력해 주세요",
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: _tossTextPrimary,
+                    height: 1.4,
+                    letterSpacing: -0.5,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 40),
+                const SizedBox(height: 40),
 
-              _buildInputField("이름", _nameController, "실명을 입력하세요"),
-              const SizedBox(height: 24),
+                _buildInputField("이름", _nameController, "실명을 입력하세요"),
+                const SizedBox(height: 24),
 
-              _buildInputField("학번", _idController, "학번 7자리를 입력하세요", keyboardType: TextInputType.number),
-              const SizedBox(height: 24),
+                _buildInputField(
+                  "학번",
+                  _idController,
+                  "학번 7자리를 입력하세요",
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 24),
 
-              _buildLabel("소속 학과"),
-              _buildDeptSelector(),
-              const SizedBox(height: 24),
+                _buildInputField(
+                  "비밀번호",
+                  _pwController,
+                  "비밀번호를 설정하세요",
+                  isObscure: true,
+                ),
 
-              _buildInputField("비밀번호", _pwController, "비밀번호를 설정하세요", isObscure: true),
-              
-              const SizedBox(height: 56),
-              _buildSubmitButton(),
-              const SizedBox(height: 40),
-            ],
+                const SizedBox(height: 56),
+                _buildSubmitButton(),
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ),
       ),
@@ -188,11 +165,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget _buildLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _tossTextSecondary)),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: _tossTextSecondary,
+        ),
+      ),
     );
   }
 
-  Widget _buildInputField(String label, TextEditingController controller, String hint, {TextInputType keyboardType = TextInputType.text, bool isObscure = false}) {
+  Widget _buildInputField(
+    String label,
+    TextEditingController controller,
+    String hint, {
+    TextInputType keyboardType = TextInputType.text,
+    bool isObscure = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -208,34 +198,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  Widget _buildDeptSelector() {
-    return InkWell(
-      onTap: _showDeptPicker,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-        decoration: BoxDecoration(
-          color: _tossGreyBg,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              _selectedDept ?? "학과를 선택해 주세요",
-              style: TextStyle(
-                color: _selectedDept == null ? _tossHint : _tossTextPrimary,
-                fontSize: 15,
-                fontWeight: _selectedDept == null ? FontWeight.normal : FontWeight.w500,
-              ),
-            ),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: _tossHint),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
@@ -247,12 +209,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
           foregroundColor: Colors.white,
           disabledBackgroundColor: _tossBlue.withValues(alpha: 0.6),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        child: _isLoading 
-          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-          : const Text("가입하기"),
+        child: _isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Text("가입하기"),
       ),
     );
   }
@@ -264,7 +235,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       filled: true,
       fillColor: _tossGreyBg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: _tossBlue, width: 1.5),

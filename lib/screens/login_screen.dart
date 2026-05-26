@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'signup_screen.dart';
-import 'qr_scan_screen.dart';
+import 'user_qr_screen.dart';
 import 'admin_login.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,9 +14,9 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _idController = TextEditingController();
   final _pwController = TextEditingController();
-  bool _isLoading = false; // 로그인 처리 중 상태 확인
+  bool _isLoading = false;
 
-  // 스타일 상수
+  // 토스 스타일 디자인 상수
   static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreyBg = Color(0xFFF2F4F6);
   static const _tossTextPrimary = Color(0xFF191F28);
@@ -32,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 알림 메시지 (SnackBar)
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -44,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // 로그인 로직
+  // 🛠️ 로그인 로직 (방법 2 적용 완료)
   Future<void> _login() async {
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
@@ -54,18 +55,30 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // 로그인 시작 시 키보드 닫기
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
     try {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(id).get();
+      // 🎯 문서 ID가 아닌 내부의 'studentId' 필드 값과 일치하는 유저를 검색합니다.
+      final userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('studentId', isEqualTo: id)
+          .get();
 
-      if (!userDoc.exists) {
+      // 검색 결과가 없는 경우 (가입되지 않은 학번)
+      if (userQuery.docs.isEmpty) {
         _showSnackBar("가입되지 않은 학번입니다.");
         return;
       }
 
-      final data = userDoc.data()!;
-      if (data['password'] != pw) {
+      // 일치하는 첫 번째 유저 문서의 데이터를 가져옵니다.
+      final userDoc = userQuery.docs.first;
+      final data = userDoc.data();
+
+      // 비밀번호 비교 검증
+      final String dbPassword = '${data['password'] ?? ''}'.trim();
+      if (dbPassword != pw) {
         _showSnackBar("비밀번호가 맞지 않아요.");
         return;
       }
@@ -78,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => QRScannerPage(userData: data)),
       );
     } catch (e) {
-      _showSnackBar("네트워크 연결을 확인해 주세요.");
+      _showSnackBar("네트워크 연결이나 Firestore 권한을 확인해 주세요.");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -111,20 +124,26 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-                const Text(
-                  "배재대학교\n스마트 출석관리",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: _tossTextPrimary,
-                    height: 1.4,
-                    letterSpacing: -0.5,
+                RichText(
+                  text: const TextSpan(
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: _tossTextPrimary,
+                      height: 1.4,
+                      letterSpacing: -0.5,
+                    ),
+                    children: [
+                      TextSpan(text: "반가워요, \n"),
+                      TextSpan(text: "Checky", style: TextStyle(color: _tossBlue)),
+                      TextSpan(text: " 에요"),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
                 const Text(
                   "학번과 비밀번호로 로그인하세요.",
-                  style: TextStyle(fontSize: 16, color: _tossTextSecondary, fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 14, color: _tossTextSecondary, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 48),
 
@@ -201,7 +220,11 @@ class _LoginScreenState extends State<LoginScreen> {
           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         child: _isLoading 
-          ? const CircularProgressIndicator(color: Colors.white) 
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+            ) 
           : const Text("로그인"),
       ),
     );
@@ -214,14 +237,9 @@ class _LoginScreenState extends State<LoginScreen> {
           context,
           MaterialPageRoute(builder: (context) => const SignUpScreen()),
         ),
-        child: RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 15, color: _tossTextSecondary),
-            children: [
-              TextSpan(text: "처음이신가요? "),
-              TextSpan(text: "회원가입", style: TextStyle(color: _tossBlue, fontWeight: FontWeight.bold)),
-            ],
-          ),
+        child: const Text(
+          "회원가입", 
+          style: TextStyle(color: _tossBlue, fontWeight: FontWeight.bold, fontSize: 15),
         ),
       ),
     );
