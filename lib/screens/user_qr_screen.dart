@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart'; // QR 코드를 그리기 위한 패키지
-import 'login_screen.dart'; 
+import 'package:qr_flutter/qr_flutter.dart';
+import '../utils/qr_manager.dart'; // 🎯 경로 확인하세요!
+import 'login_screen.dart';
 
 class QRScannerPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -12,14 +14,49 @@ class QRScannerPage extends StatefulWidget {
 }
 
 class _QRScannerPageState extends State<QRScannerPage> {
-  // 토스 스타일 색상 구성
   static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreyText = Color(0xFF8B95A1);
   static const _tossBg = Color(0xFFF2F4F6);
   static const _tossBlack = Color(0xFF191F28);
   static const _cardBorder = Color(0xFFE5E8EB);
 
-  // 🔔 로그아웃 확인 팝업창 함수
+  late String _qrData;
+  Timer? _timer;
+  int _secondsLeft = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshQR();
+    // 🎯 1초마다 남은 시간 체크 및 갱신 타이머
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          if (_secondsLeft > 1) {
+            _secondsLeft--;
+          } else {
+            _refreshQR();
+          }
+        });
+      }
+    });
+  }
+
+  void _refreshQR() {
+    final studentId = '${widget.userData['studentId'] ?? ''}'.trim();
+    final name = '${widget.userData['name'] ?? ''}'.trim();
+    setState(() {
+      _qrData = DynamicQRManager.generate(studentId, name);
+      _secondsLeft = 30;
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel(); // 🎯 메모리 누수 방지
+    super.dispose();
+  }
+
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -40,27 +77,22 @@ class _QRScannerPageState extends State<QRScannerPage> {
           ),
           content: const Text(
             '로그아웃 하시겠습니까?',
-            style: TextStyle(
-              color: _tossBlack,
-              fontSize: 15,
-            ),
+            style: TextStyle(color: _tossBlack, fontSize: 15),
           ),
-          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context), 
+              onPressed: () => Navigator.pop(context),
               child: const Text(
                 '취소',
                 style: TextStyle(
                   color: _tossGreyText,
                   fontWeight: FontWeight.w600,
-                  fontSize: 15,
                 ),
               ),
             ),
             TextButton(
               onPressed: () {
-                Navigator.pop(context); 
+                Navigator.pop(context);
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -72,7 +104,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
                 style: TextStyle(
                   color: Colors.redAccent,
                   fontWeight: FontWeight.bold,
-                  fontSize: 15,
                 ),
               ),
             ),
@@ -84,38 +115,29 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 파이어베이스 데이터 안전 추출
     final name = '${widget.userData['name'] ?? '이름 없음'}'.trim();
     final studentId = '${widget.userData['studentId'] ?? '학번 누락'}'.trim();
     final department = '${widget.userData['department'] ?? '행사 참여자'}'.trim();
-
-    // 행사 이름 정보를 제외하고 오직 관리자 매핑용 학번과 이름만 QR에 주입
-    final String qrData = 'UID:$studentId,NAME:$name';
 
     return Scaffold(
       backgroundColor: _tossBg,
       appBar: AppBar(
         backgroundColor: _tossBg,
         elevation: 0,
-        scrolledUnderElevation: 0,
-        title: const Text(''), // 🎯 '나의 입장 QR' 텍스트 완전 제거
-        automaticallyImplyLeading: false, 
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: _tossGreyText),
-            onPressed: () {
-              _showLogoutDialog(context);
-            },
+            onPressed: () => _showLogoutDialog(context),
           ),
         ],
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10), // 앱바 타이틀이 사라진 만큼 상단 여백 최적화
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 👤 사용자 정보 카드 영역
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -125,7 +147,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   border: Border.all(color: _cardBorder, width: 0.8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.015),
+                      color: Colors.black.withOpacity(0.015),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -143,12 +165,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      name, 
+                      name,
                       style: const TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
                         color: _tossBlack,
-                        letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -160,13 +181,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
                         color: _tossGreyText,
                       ),
                     ),
-                    
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
                       child: Divider(color: _cardBorder, height: 1),
                     ),
 
-                    // 🏁 QR 코드 표시 영역
+                    // 🎯 QR 코드 표시 영역 (동적 데이터 적용)
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -174,10 +194,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: QrImageView(
-                        data: qrData, 
+                        data: _qrData,
                         version: QrVersions.auto,
                         size: 200.0,
-                        gapless: false,
                         eyeStyle: const QrEyeStyle(
                           eyeShape: QrEyeShape.square,
                           color: _tossBlack,
@@ -188,15 +207,31 @@ class _QRScannerPageState extends State<QRScannerPage> {
                         ),
                       ),
                     ),
-                    
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+                    // ⏳ 남은 시간 표시
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.timer_outlined,
+                          size: 16,
+                          color: Colors.redAccent,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '남은 시간: $_secondsLeft초',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
                     const Text(
-                      '행사 관리자에게 QR 코드를 보여주세요.',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: _tossGreyText,
-                      ),
+                      '관리자에게 QR 코드를 보여주세요.',
+                      style: TextStyle(fontSize: 14, color: _tossGreyText),
                     ),
                   ],
                 ),
