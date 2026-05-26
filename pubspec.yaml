@@ -28,6 +28,8 @@ dependencies:
   shared_preferences: ^2.2.3
   qr_flutter: ^4.1.0
   http: ^1.6.0
+  csv: ^8.0.0
+  file_picker: ^11.0.2
   # ✂️ flutter_local_notifications (알림 기능 제거 완료)
 
 dev_dependencies:
