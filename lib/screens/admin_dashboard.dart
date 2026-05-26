@@ -4,6 +4,7 @@ import 'admin_qr_camera_tab.dart';
 import 'admin_statistics_tab.dart';
 import 'pre_registration_list.dart';
 import 'admin_attendance_list.dart';
+import 'admin_user_approval.dart'; // 🎯 [추가] 새로 만든 가입자 승인 화면 임포트
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -20,10 +21,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const _tossGreyText = Color(0xFF8B95A1);
   static const _tossBg = Color(0xFFF2F4F6);
 
-  // 🎯 하단 탭바를 통해서도 접근할 수 있도록 기존 리스트 유지
   List<Widget> get _pages => [
         AdminHomeTab(
-          onTabChange: _changeTab,
           onLogoutPress: () => _showLogoutDialog(context),
         ),
         const AdminAttendanceList(), 
@@ -161,12 +160,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 }
 
 class AdminHomeTab extends StatelessWidget {
-  final Function(int) onTabChange;
   final VoidCallback onLogoutPress;
 
   const AdminHomeTab({
     super.key, 
-    required this.onTabChange,
     required this.onLogoutPress,
   });
 
@@ -208,22 +205,53 @@ class AdminHomeTab extends StatelessWidget {
                   );
                 },
               ),
-              // 🎯 [수정 핵심 영역] 실시간 출석 카드 클릭 시 슬라이딩 애니메이션 페이지 전환 구현
               _buildTossCard(
                 context,
                 title: "실시간 출석",
                 subtitle: "QR 현황",
+                icon: Icons.fact_check_rounded,
+                iconColor: const Color(0xFF00AD5C), 
+                iconBgColor: const Color(0xFFE5F7ED),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminAttendanceList(),
+                    ),
+                  );
+                }, 
+              ),
+              _buildTossCard(
+                context,
+                title: "QR 스캔",
+                subtitle: "카메라 연동",
                 icon: Icons.qr_code_scanner_rounded,
-                iconColor: const Color(0xFF3182F6), 
+                iconColor: const Color(0xFF3182F6),
                 iconBgColor: const Color(0xFFE8F3FF),
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AdminAttendanceList(), // 👈 부드럽게 새 화면으로 push 해줍니다.
+                      builder: (context) => const AdminQrCameraTab(),
                     ),
                   );
-                }, 
+                },
+              ),
+              _buildTossCard(
+                context,
+                title: "출석 통계",
+                subtitle: "실시간 그래프",
+                icon: Icons.bar_chart_rounded,
+                iconColor: const Color(0xFFFF6B6B),
+                iconBgColor: const Color(0xFFFFEAEA),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminStatisticsTab(),
+                    ),
+                  );
+                },
               ),
               _buildTossCard(
                 context,
@@ -233,7 +261,13 @@ class AdminHomeTab extends StatelessWidget {
                 iconColor: const Color(0xFF6B66FF),
                 iconBgColor: const Color(0xFFF0F0FF),
                 onTap: () {
-                  // TODO: 가입자 승인 페이지 생성 후 Navigator 연결
+                  // 🎯 [수정 완료] 이제 카드 클릭 시 가입자 승인 화면으로 라우팅됩니다.
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminUserApprovalScreen(),
+                    ),
+                  );
                 },
               ),
             ],

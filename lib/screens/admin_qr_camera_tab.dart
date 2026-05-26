@@ -19,7 +19,6 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
   bool _isProcessing = false;
 
   // 토스 스타일 상수 정의
-  static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreen = Color(0xFF00AD5C);
   static const _tossBlack = Color(0xFF191F28);
   static const _tossGrey = Color(0xFF8B95A1);
@@ -31,6 +30,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
   }
 
   // QR 데이터 파싱 및 Firestore 업로드 처리 함수
+  // QR 데이터 파싱 및 Firestore 업로드 처리 함수
   Future<void> _handleQrDetection(String qrRawValue) async {
     if (_isProcessing) return;
 
@@ -39,7 +39,6 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
     });
 
     try {
-      // 데이터 예시 규격이 "학번,이름" 형태이거나 단일 학번 형태일 때를 유연하게 대응합니다.
       String studentId = qrRawValue.trim();
       String userName = "확인된 학생";
 
@@ -49,25 +48,65 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
         userName = parts[1].trim();
       }
 
+      // QR 코드 원본 데이터에 포함된 태그 제거
+      studentId = studentId.replaceFirst('UID:', '').trim();
+      userName = userName.replaceFirst('NAME:', '').trim();
+
       if (studentId.isEmpty) {
         throw Exception("유효하지 않은 QR 코드 데이터입니다.");
       }
 
-      // 🎯 [중요] Firestore 실제 문서 형식에 맞춰 3가지 핵심 필드만 생성하여 업로드
-      await _firestore.collection('attendance').add({
+      // 1. 오늘 날짜 구하기 (예: 20260526)
+      final now = DateTime.now();
+      // 🎯 오늘 날짜 문자열 생성 (예: "20260526")
+      final todayStr =
+          "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}";
+
+      // 🎯 고유한 문서 ID 생성 (학번_이름_날짜 조합으로 하루에 딱 한 번만 출석 가능하게 수정)
+      final docId = "${studentId}_${userName}_$todayStr";
+
+      // 파이어베이스 존재 여부 확인
+      final docRef = _firestore.collection('attendance').doc(docId);
+      final docSnapshot = await docRef.get();
+      if (!mounted) return;
+
+      // 이미 파일이 존재한다면 = 오늘 이미 출석을 한 학생!
+      if (docSnapshot.exists) {
+        _showResultSnackBar(
+          context,
+          "이름: $userName / 학번: $studentId\n이미 출석이 완료된 학생입니다.",
+          isSuccess: false, // 빨간색 알림창
+        );
+
+        await Future.delayed(const Duration(seconds: 2));
+        return;
+      }
+
+      // 🎯 4. 중복이 없을 때만 지정한 문서 ID로 파이어베이스 파일(문서) 생성!
+      // 원하셨던 대로 딱 핵심 3가지 필드만 깔끔하게 저장됩니다.
+      await docRef.set({
         'studentId': studentId,
         'userName': userName,
-        'timestamp': FieldValue.serverTimestamp(), // 서버 표준 시간 입력
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
-      _showResultSnackBar(context, "$userName($studentId) 출석 처리 완료", isSuccess: true);
 
-      // 연속 스캔을 위한 짧은 딜레이 대기
+      // 첫 출석 성공 알림창 (초록색)
+      _showResultSnackBar(
+        context,
+        "이름: $userName / 학번: $studentId\n출석 처리가 완료되었습니다.",
+        isSuccess: true,
+      );
+
       await Future.delayed(const Duration(seconds: 2));
     } catch (e) {
       if (!mounted) return;
-      _showResultSnackBar(context, "오류가 발생했습니다: ${e.toString()}", isSuccess: false);
+      _showResultSnackBar(
+        context,
+        "오류가 발생했습니다: ${e.toString()}",
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -77,27 +116,46 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
     }
   }
 
-  void _showResultSnackBar(BuildContext context, String message, {required bool isSuccess}) {
+  // 토스 느낌의 둥글고 입체감 있는 플로팅 스낵바 구현
+  void _showResultSnackBar(
+    BuildContext context,
+    String message, {
+    required bool isSuccess,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isSuccess ? Icons.check_circle_rounded : Icons.error_rounded,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+        content: Container(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+          child: Row(
+            children: [
+              Icon(
+                isSuccess ? Icons.check_circle_rounded : Icons.error_rounded,
+                color: Colors.white,
+                size: 26,
               ),
-            ),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    letterSpacing: -0.3,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        backgroundColor: isSuccess ? _tossGreen : Colors.redAccent,
+        backgroundColor: isSuccess
+            ? _tossGreen
+            : Colors.redAccent, // 👈 false일 때 투명도 없는 진한 빨간색 적용
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(20),
+        elevation: 6,
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -113,7 +171,11 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
         scrolledUnderElevation: 0,
         title: const Text(
           "출석 QR 스캔",
-          style: TextStyle(color: _tossBlack, fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            color: _tossBlack,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         centerTitle: true,
       ),
@@ -124,11 +186,14 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
             children: [
               const Text(
                 "학생들의 출석 QR 코드를 카메라 중앙에 맞춰주세요.",
-                style: TextStyle(color: _tossGrey, fontSize: 14, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: _tossGrey,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              // 🎯 에러가 발생하던 파라미터 구문을 패키지 표준 규격에 맞게 안전하게 변경
               Container(
                 height: MediaQuery.of(context).size.width * 0.85,
                 width: MediaQuery.of(context).size.width * 0.85,
@@ -139,7 +204,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
                       color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 15,
                       offset: const Offset(0, 5),
-                    )
+                    ),
                   ],
                 ),
                 child: ClipRRect(
@@ -158,12 +223,13 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
                           }
                         },
                       ),
-                      // 처리 중일 때 화면을 흐리게 덮어주는 오버레이 효과
                       if (_isProcessing)
                         Container(
                           color: Colors.black.withValues(alpha: 0.5),
                           child: const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -192,7 +258,11 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
         children: [
           Text(
             "💡 스캔 가이드",
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _tossBlack),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: _tossBlack,
+            ),
           ),
           SizedBox(height: 10),
           Text(

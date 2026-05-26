@@ -45,7 +45,36 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // 🛠️ 로그인 로직 (방법 2 적용 완료)
+  // 가입 승인 대기 안내 토스 스타일 팝업
+  void _showApprovalWarningDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_clock_rounded, color: Colors.orangeAccent, size: 24),
+            SizedBox(width: 8),
+            Text("승인 대기 중", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _tossTextPrimary)),
+          ],
+        ),
+        content: const Text(
+          "아직 가입 승인이 되지 않았습니다.\n관리자가 승인 완료한 후 로그인이 가능합니다.",
+          style: TextStyle(fontSize: 14, color: _tossTextSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("확인", style: TextStyle(color: _tossBlue, fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 로그인 로직 (문자열 승인 검증 적용)
   Future<void> _login() async {
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
@@ -55,24 +84,20 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // 로그인 시작 시 키보드 닫기
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
     try {
-      // 🎯 문서 ID가 아닌 내부의 'studentId' 필드 값과 일치하는 유저를 검색합니다.
       final userQuery = await FirebaseFirestore.instance
           .collection('users')
           .where('studentId', isEqualTo: id)
           .get();
 
-      // 검색 결과가 없는 경우 (가입되지 않은 학번)
       if (userQuery.docs.isEmpty) {
         _showSnackBar("가입되지 않은 학번입니다.");
         return;
       }
 
-      // 일치하는 첫 번째 유저 문서의 데이터를 가져옵니다.
       final userDoc = userQuery.docs.first;
       final data = userDoc.data();
 
@@ -83,9 +108,17 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
+      // 🎯 [핵심] 상태 문자열 검증 ("승인"이 아니면 로그인 차단)
+      final String status = data['status'] ?? "비승인";
+      if (status != "승인") {
+        if (!mounted) return;
+        _showApprovalWarningDialog();
+        return;
+      }
+
       if (!mounted) return;
 
-      // 로그인 성공 시 QR 스캐너 페이지로 이동
+      // 승인 상태가 확실할 때만 화면 전환
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => QRScannerPage(userData: data)),
@@ -100,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(), // 화면 터치 시 키보드 닫기
+      onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(

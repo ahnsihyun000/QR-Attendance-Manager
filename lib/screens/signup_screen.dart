@@ -30,22 +30,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _showSnackBar(String message) {
-    if (!mounted) return; // 화면이 사라진 상태에서 스낵바 호출 방지
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           message,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: const TextStyle(fontWeight: FontWeight.w600, height: 1.3),
         ),
         backgroundColor: const Color(0xFF333D4B),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        duration: const Duration(seconds: 4),
       ),
     );
   }
 
-  // 회원가입 로직
+  // 🎯 회원가입 로직 (학번 + 이름 실시간 동시 크로스체크 대조)
   Future<void> _register() async {
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
@@ -59,35 +60,52 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. ✨ [가장 안전한 방법] 고유한 값인 학번(Document ID)으로 중복 가입 여부 확인
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(id)
+      // 1️⃣ [핵심 대조 단계] 사전 신청 명단에서 학번과 이름이 동시에 일치하는 문서가 있는지 쿼리합니다.
+      final preRegQuery = await FirebaseFirestore.instance
+          .collection('pre-investigation list')
+          .where('studentId', isEqualTo: id)
+          .where('userName', isEqualTo: name) // 🎯 이름 필드까지 엄격하게 검증 추가!
           .get();
 
-      if (doc.exists) {
-        _showSnackBar("이미 가입된 학생입니다.");
-        return; // finally 블록에서 로딩 상태가 자동으로 해제됩니다.
+      // 학번과 이름 조합이 일치하는 사전 신청 내역이 없다면 가입을 차단합니다.
+      if (preRegQuery.docs.isEmpty) {
+        _showSnackBar("사전 신청한 학생 정보와 일치하지 않습니다.\n행사에 참여하시려면 사전 신청을 진행해 주세요.");
+        return;
       }
 
-      // 2. 중복된 학번이 없다면 신규 회원 정보 Firestore에 저장
-      // 문자열 안에서 $id와 $name을 사용하고 사이에 공백을 한 칸 둡니다.
-      String docId = '$id $name';
+      // 2️⃣ 중복 가입 여부 체크 (이미 가입 처리가 완료된 유저인지 식별)
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(id) // 학번 자체를 단독 ID로 검증하거나 하단 docId 포맷에 맞춥니다.
+          .get();
 
+      // 혹시 '학번 이름' 포맷의 문서 ID 중복도 함께 안전하게 방어하기 위한 정의
+      String docId = '$id $name';
+      final alternativeDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(docId)
+          .get();
+
+      if (doc.exists || alternativeDoc.exists) {
+        _showSnackBar("이미 가입 승인 대기 중이거나 가입된 학생입니다.");
+        return;
+      }
+
+      // 3️⃣ 사전 신청 기록(학번+이름)이 완벽히 증명되었으므로 가입 최종 승인 대기 처리 진행
       await FirebaseFirestore.instance.collection('users').doc(docId).set({
         'studentId': id,
         'password': pw,
         'name': name,
         'createdAt': FieldValue.serverTimestamp(),
+        'status': "비승인", // 가입자 승인 화면으로 정상 이동하게 유도
       });
 
       if (!mounted) return;
-      _showSnackBar("가입을 축하합니다! 🎉");
-      Navigator.pop(context); // 로그인 화면으로 이동
+      _showSnackBar("회원가입 요청이 완료되었습니다.\n관리자 승인 후 로그인이 가능합니다!");
+      Navigator.pop(context);
     } catch (e) {
-      _showSnackBar("가입에 실패했습니다. 다시 시도해 주세요.");
+      _showSnackBar("가입 처리 중 오류가 발생했습니다. 다시 시도해 주세요.");
     } finally {
-      // 가입 성공, 중복 차단, 통신 에러 등 어떤 경로로 종료되든 로딩 애니메이션 안전하게 해제
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -159,8 +177,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
     );
   }
-
-  // --- UI 컴포넌트 ---
 
   Widget _buildLabel(String label) {
     return Padding(

@@ -27,6 +27,15 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
         backgroundColor: _tossBg,
         elevation: 0,
         scrolledUnderElevation: 0,
+        // 🎯 이미지와 매칭되는 토스 스타일 얇은 뒤로가기 화살표 반영
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded, // 얇고 꺾인 디자인의 아이콘
+            color: _tossBlack,
+            size: 20, // 토스 특유의 컴팩트한 사이즈
+          ),
+        ),
         title: const Text(
           "실시간 출석 명단",
           style: TextStyle(
@@ -56,7 +65,6 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              // 🎯 실제 콘솔 구조에 맞춰 timestamp 내림차순(최신순) 정렬 쿼리 적용
               stream: _firestore
                   .collection('attendance')
                   .orderBy('timestamp', descending: true)
@@ -160,7 +168,7 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
     );
   }
 
-  // 🎯 실제 Firestore 문서 필드 기반으로 매칭한 출석 명단 리스트 카드 위젯
+  // 실제 Firestore 문서 필드 기반으로 매칭한 출석 명단 리스트 카드 위젯
   Widget _buildAttendanceListItem(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
