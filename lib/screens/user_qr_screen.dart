@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../utils/qr_manager.dart'; // 🎯 경로 확인하세요!
+import '../utils/qr_manager.dart';
 import 'login_screen.dart';
 
 class QRScannerPage extends StatefulWidget {
@@ -28,7 +28,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
   void initState() {
     super.initState();
     _refreshQR();
-    // 🎯 1초마다 남은 시간 체크 및 갱신 타이머
+    // 남은 시간을 1초마다 줄이고, 만료되면 새 QR을 생성합니다.
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
@@ -53,7 +53,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   void dispose() {
-    _timer?.cancel(); // 🎯 메모리 누수 방지
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -147,7 +147,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   border: Border.all(color: _cardBorder, width: 0.8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.015),
+                      color: Colors.black.withValues(alpha: 0.015),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -186,7 +186,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
                       child: Divider(color: _cardBorder, height: 1),
                     ),
 
-                    // 🎯 QR 코드 표시 영역 (동적 데이터 적용)
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -208,7 +207,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // ⏳ 남은 시간 표시
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

@@ -1,5 +1,5 @@
 name: qr_attendance_manager
-description: "A new Flutter project."
+description: "Flutter QR attendance management app."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -14,7 +14,7 @@ dependencies:
   # 날짜 및 시간 포맷팅
   intl: ^0.20.2
 
-  # Firebase 및 스캐너 관련
+  # Firebase 및 QR 스캐너
   firebase_database: any
   mobile_scanner: any
   permission_handler: ^12.0.1
@@ -31,28 +31,27 @@ dependencies:
   csv: ^8.0.0
   file_picker: ^11.0.2
   crypto: ^3.0.7
-  # ✂️ flutter_local_notifications (알림 기능 제거 완료)
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   
-  # ✨ 스플래시 화면 생성 도구
+  # 스플래시 화면 생성 도구
   flutter_native_splash: ^2.4.0
   
-  # ✨ 앱 아이콘 생성 도구
+  # 앱 아이콘 생성 도구
   flutter_launcher_icons: ^0.13.1
 
-# 🖼️ 스플래시 화면 상세 설정 (앱 실행 시 잠깐 나오는 화면)
+# 앱 실행 시 표시되는 스플래시 화면 설정
 flutter_native_splash:
-  color: "#ffffff" # 배경색 (흰색)
-  image: assets/images/logo.png # 중앙 이미지 경로
+  color: "#ffffff"
+  image: assets/images/logo.png
   android_12:
     image: assets/images/logo.png
     color: "#ffffff"
 
-# 📱 앱 아이콘 상세 설정 (휴대폰 홈 화면 아이콘)
+# 앱 아이콘 설정
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
@@ -63,4 +62,4 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/logo.png # ✨ 로고 파일 에셋 등록
+    - assets/images/logo.png

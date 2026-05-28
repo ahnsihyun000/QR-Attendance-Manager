@@ -14,7 +14,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _nameController = TextEditingController();
   bool _isLoading = false;
 
-  // 스타일 상수 (Toss Style)
+  // 회원가입 화면에서 반복해서 쓰는 색상값입니다.
   static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreyBg = Color(0xFFF2F4F6);
   static const _tossTextPrimary = Color(0xFF191F28);
@@ -46,7 +46,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // 🎯 회원가입 로직 (학번 + 이름 실시간 동시 크로스체크 대조)
+  // 사전 신청 명단과 일치하는 학생만 가입 승인 대기 상태로 저장합니다.
   Future<void> _register() async {
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
@@ -60,26 +60,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1️⃣ [핵심 대조 단계] 사전 신청 명단에서 학번과 이름이 동시에 일치하는 문서가 있는지 쿼리합니다.
       final preRegQuery = await FirebaseFirestore.instance
           .collection('pre-investigation list')
           .where('studentId', isEqualTo: id)
-          .where('userName', isEqualTo: name) // 🎯 이름 필드까지 엄격하게 검증 추가!
+          .where('userName', isEqualTo: name)
           .get();
 
-      // 학번과 이름 조합이 일치하는 사전 신청 내역이 없다면 가입을 차단합니다.
       if (preRegQuery.docs.isEmpty) {
         _showSnackBar("사전 신청한 학생 정보와 일치하지 않습니다.\n행사에 참여하시려면 사전 신청을 진행해 주세요.");
         return;
       }
 
-      // 2️⃣ 중복 가입 여부 체크 (이미 가입 처리가 완료된 유저인지 식별)
       final doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(id) // 학번 자체를 단독 ID로 검증하거나 하단 docId 포맷에 맞춥니다.
+          .doc(id)
           .get();
 
-      // 혹시 '학번 이름' 포맷의 문서 ID 중복도 함께 안전하게 방어하기 위한 정의
       String docId = '$id $name';
       final alternativeDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -91,13 +87,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         return;
       }
 
-      // 3️⃣ 사전 신청 기록(학번+이름)이 완벽히 증명되었으므로 가입 최종 승인 대기 처리 진행
       await FirebaseFirestore.instance.collection('users').doc(docId).set({
         'studentId': id,
         'password': pw,
         'name': name,
         'createdAt': FieldValue.serverTimestamp(),
-        'status': "비승인", // 가입자 승인 화면으로 정상 이동하게 유도
+        'status': "비승인",
       });
 
       if (!mounted) return;
@@ -144,7 +139,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     fontWeight: FontWeight.bold,
                     color: _tossTextPrimary,
                     height: 1.4,
-                    letterSpacing: -0.5,
+                    letterSpacing: 0,
                   ),
                 ),
                 const SizedBox(height: 40),

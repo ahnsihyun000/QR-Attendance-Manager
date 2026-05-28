@@ -16,7 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _pwController = TextEditingController();
   bool _isLoading = false;
 
-  // 토스 스타일 디자인 상수
+  // 로그인 화면에서 반복해서 쓰는 색상값입니다.
   static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreyBg = Color(0xFFF2F4F6);
   static const _tossTextPrimary = Color(0xFF191F28);
@@ -30,12 +30,14 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // 알림 메시지 (SnackBar)
   void _showSnackBar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
         backgroundColor: const Color(0xFF333D4B),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
@@ -45,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // 가입 승인 대기 안내 토스 스타일 팝업
+  // 관리자가 가입을 승인하기 전에는 학생 로그인을 막습니다.
   void _showApprovalWarningDialog() {
     showDialog(
       context: context,
@@ -55,26 +57,48 @@ class _LoginScreenState extends State<LoginScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Row(
           children: [
-            Icon(Icons.lock_clock_rounded, color: Colors.orangeAccent, size: 24),
+            Icon(
+              Icons.lock_clock_rounded,
+              color: Colors.orangeAccent,
+              size: 24,
+            ),
             SizedBox(width: 8),
-            Text("승인 대기 중", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _tossTextPrimary)),
+            Text(
+              "승인 대기 중",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: _tossTextPrimary,
+              ),
+            ),
           ],
         ),
         content: const Text(
           "아직 가입 승인이 되지 않았습니다.\n관리자가 승인 완료한 후 로그인이 가능합니다.",
-          style: TextStyle(fontSize: 14, color: _tossTextSecondary, height: 1.4),
+          style: TextStyle(
+            fontSize: 14,
+            color: _tossTextSecondary,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("확인", style: TextStyle(color: _tossBlue, fontWeight: FontWeight.bold, fontSize: 15)),
+            child: const Text(
+              "확인",
+              style: TextStyle(
+                color: _tossBlue,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // 로그인 로직 (문자열 승인 검증 적용)
+  // 학번, 비밀번호, 승인 상태를 순서대로 확인합니다.
   Future<void> _login() async {
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
@@ -101,14 +125,12 @@ class _LoginScreenState extends State<LoginScreen> {
       final userDoc = userQuery.docs.first;
       final data = userDoc.data();
 
-      // 비밀번호 비교 검증
       final String dbPassword = '${data['password'] ?? ''}'.trim();
       if (dbPassword != pw) {
         _showSnackBar("비밀번호가 맞지 않아요.");
         return;
       }
 
-      // 🎯 [핵심] 상태 문자열 검증 ("승인"이 아니면 로그인 차단)
       final String status = data['status'] ?? "비승인";
       if (status != "승인") {
         if (!mounted) return;
@@ -118,7 +140,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // 승인 상태가 확실할 때만 화면 전환
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => QRScannerPage(userData: data)),
@@ -141,10 +162,15 @@ class _LoginScreenState extends State<LoginScreen> {
           elevation: 0,
           actions: [
             IconButton(
-              icon: const Icon(Icons.admin_panel_settings_rounded, color: _tossHint),
+              icon: const Icon(
+                Icons.admin_panel_settings_rounded,
+                color: _tossHint,
+              ),
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AdminLoginScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const AdminLoginScreen(),
+                ),
               ),
               tooltip: "관리자 로그인",
             ),
@@ -164,11 +190,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       fontWeight: FontWeight.bold,
                       color: _tossTextPrimary,
                       height: 1.4,
-                      letterSpacing: -0.5,
+                      letterSpacing: 0,
                     ),
                     children: [
                       TextSpan(text: "반가워요, \n"),
-                      TextSpan(text: "Checky", style: TextStyle(color: _tossBlue)),
+                      TextSpan(
+                        text: "Checky",
+                        style: TextStyle(color: _tossBlue),
+                      ),
                       TextSpan(text: " 에요"),
                     ],
                   ),
@@ -176,7 +205,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 12),
                 const Text(
                   "학번과 비밀번호로 로그인하세요.",
-                  style: TextStyle(fontSize: 14, color: _tossTextSecondary, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _tossTextSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 48),
 
@@ -223,7 +256,14 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _tossTextSecondary)),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: _tossTextSecondary,
+            ),
+          ),
         ),
         TextField(
           controller: controller,
@@ -249,16 +289,21 @@ class _LoginScreenState extends State<LoginScreen> {
           foregroundColor: Colors.white,
           disabledBackgroundColor: _tossBlue.withValues(alpha: 0.6),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        child: _isLoading 
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-            ) 
-          : const Text("로그인"),
+        child: _isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : const Text("로그인"),
       ),
     );
   }
@@ -271,8 +316,12 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (context) => const SignUpScreen()),
         ),
         child: const Text(
-          "회원가입", 
-          style: TextStyle(color: _tossBlue, fontWeight: FontWeight.bold, fontSize: 15),
+          "회원가입",
+          style: TextStyle(
+            color: _tossBlue,
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
         ),
       ),
     );
@@ -285,7 +334,10 @@ class _LoginScreenState extends State<LoginScreen> {
       filled: true,
       fillColor: _tossGreyBg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: _tossBlue, width: 1.5),

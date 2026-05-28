@@ -10,10 +10,10 @@ class AdminStatisticsTab extends StatefulWidget {
 }
 
 class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
-  // 🎯 선택된 행사명 (초기값 null, 첫 로드 시 자동 할당)
+  // 첫 로드 후 사전 신청 명단에 있는 행사명 중 하나를 선택 상태로 둡니다.
   String? _selectedEventName;
 
-  // 🎨 토스 스타일 색상 상수
+  // 화면 전체에서 반복해서 쓰는 색상값입니다.
   static const Color _tossBlue = Color(0xFF3182F6);
   static const Color _tossRed = Color(0xFFFF6B6B);
   static const Color _tossBg = Color(0xFFF2F4F6);
@@ -26,7 +26,6 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
     return Scaffold(
       backgroundColor: _tossBg,
       resizeToAvoidBottomInset: false,
-      // 🎯 상단 앱바 구조를 추가하여 깔끔하게 타이틀 크기 18 및 뒤로가기 버튼 구현
       appBar: AppBar(
         backgroundColor: _tossBg,
         elevation: 0,
@@ -34,7 +33,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(
-            Icons.arrow_back_ios_new_rounded, // 토스 스타일 얇은 화살표
+            Icons.arrow_back_ios_new_rounded,
             color: _tossBlack,
             size: 20,
           ),
@@ -42,7 +41,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
         title: const Text(
           "출석 통계",
           style: TextStyle(
-            fontSize: 18, // 👈 요청하신 글자 크기 18 반영
+            fontSize: 18,
             fontWeight: FontWeight.bold,
             color: _tossBlack,
           ),
@@ -50,16 +49,20 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
         centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // 1️⃣ 사전 신청자 명단(pre-investigation list) 로드하여 행사 종류 추출
-        stream: FirebaseFirestore.instance.collection('pre-investigation list').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('pre-investigation list')
+            .snapshots(),
         builder: (context, preInvestigationSnapshot) {
-          if (preInvestigationSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: _tossBlue));
+          if (preInvestigationSnapshot.connectionState ==
+              ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: _tossBlue),
+            );
           }
 
           final preDocs = preInvestigationSnapshot.data?.docs ?? [];
           Set<String> eventNameSet = {};
-          
+
           for (var doc in preDocs) {
             final data = doc.data() as Map<String, dynamic>;
             if (data['department'] != null) {
@@ -70,51 +73,55 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
           List<String> eventNames = eventNameSet.toList()..sort();
           if (eventNames.isEmpty) eventNames.add('등록된 행사 없음');
 
-          // 바텀 시트 초기 선택값 설정
-          if (_selectedEventName == null || !eventNames.contains(_selectedEventName)) {
+          if (_selectedEventName == null ||
+              !eventNames.contains(_selectedEventName)) {
             _selectedEventName = eventNames.first;
           }
 
-          // 2️⃣ 실시간 출석 기록 명단(attendance) 로드
           return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('attendance').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('attendance')
+                .snapshots(),
             builder: (context, attendanceSnapshot) {
-              if (attendanceSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: _tossBlue));
+              if (attendanceSnapshot.connectionState ==
+                  ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: _tossBlue),
+                );
               }
 
               final attendanceDocs = attendanceSnapshot.data?.docs ?? [];
 
-              // 📊 통계 변수 초기화
               int attendedCount = 0;
               int missingCount = 0;
 
-              // 현재 선택된 행사 이름에 맞는 데이터 매칭 계산 시작
+              // 선택된 행사 신청자와 출석 컬렉션의 학번을 비교해 출석률을 계산합니다.
               for (var preDoc in preDocs) {
                 final preData = preDoc.data() as Map<String, dynamic>;
-                final String targetEventName = (preData['department'] ?? '').toString().trim();
+                final String targetEventName = (preData['department'] ?? '')
+                    .toString()
+                    .trim();
 
-                // 조건 1: 현재 바텀 시트에서 선택한 행사 소속 학생인지 확인
                 if (targetEventName == _selectedEventName) {
-                  
-                  // 사전 신청 정보에서 학번 추출
-                  final String preStudentId = (preData['studentId'] ?? '').toString().trim();
+                  final String preStudentId = (preData['studentId'] ?? '')
+                      .toString()
+                      .trim();
 
                   bool hasAttended = false;
 
-                  // 조건 2: attendance 컬렉션에 이 학번을 가진 문서가 존재하는지 검색
                   for (var attDoc in attendanceDocs) {
                     final attData = attDoc.data() as Map<String, dynamic>;
-                    final String attStudentId = (attData['studentId'] ?? '').toString().trim();
+                    final String attStudentId = (attData['studentId'] ?? '')
+                        .toString()
+                        .trim();
 
-                    // status 필드 조건 검사를 빼고, 학번이 일치하는 데이터가 존재만 하면 출석 인정!
-                    if (preStudentId.isNotEmpty && preStudentId == attStudentId) {
+                    if (preStudentId.isNotEmpty &&
+                        preStudentId == attStudentId) {
                       hasAttended = true;
                       break;
                     }
                   }
 
-                  // 결과 카운트 분기 주입
                   if (hasAttended) {
                     attendedCount++;
                   } else {
@@ -123,9 +130,10 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                 }
               }
 
-              // 출석률 퍼센트 계산
               int total = attendedCount + missingCount;
-              double attendPercent = total == 0 ? 0 : (attendedCount / total) * 100;
+              double attendPercent = total == 0
+                  ? 0
+                  : (attendedCount / total) * 100;
 
               return SafeArea(
                 child: SingleChildScrollView(
@@ -133,12 +141,10 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ✨ 깔끔한 토스 스타일 바텀 시트 트리거 버튼
                       _buildEventSelector(eventNames),
 
                       const SizedBox(height: 30),
 
-                      // 📊 원형 통계 파이 차트
                       Container(
                         height: 240,
                         decoration: BoxDecoration(
@@ -154,7 +160,11 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                                 sections: [
                                   PieChartSectionData(
                                     color: _tossBlue,
-                                    value: (attendedCount == 0 && missingCount == 0) ? 1 : attendedCount.toDouble(),
+                                    value:
+                                        (attendedCount == 0 &&
+                                            missingCount == 0)
+                                        ? 1
+                                        : attendedCount.toDouble(),
                                     radius: 25,
                                     showTitle: false,
                                   ),
@@ -173,9 +183,19 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                                 children: [
                                   Text(
                                     '${attendPercent.toStringAsFixed(1)}%',
-                                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: _tossBlue),
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      color: _tossBlue,
+                                    ),
                                   ),
-                                  const Text('출석률', style: TextStyle(fontSize: 14, color: _tossGrey)),
+                                  const Text(
+                                    '출석률',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: _tossGrey,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -183,8 +203,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      
-                      // 🔢 하단 스코어 보드
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -203,7 +222,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
     );
   }
 
-  // ✨ 바텀 시트를 여는 카드 형태의 버튼
+  // 선택된 행사명을 보여주고, 탭하면 행사 선택 바텀 시트를 엽니다.
   Widget _buildEventSelector(List<String> eventNames) {
     return GestureDetector(
       onTap: () => _showTossStyleSheet(eventNames),
@@ -226,18 +245,26 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
             Expanded(
               child: Text(
                 _selectedEventName ?? "행사를 선택하세요",
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _tossBlack),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _tossBlack,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: _tossGrey, size: 24),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: _tossGrey,
+              size: 24,
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ✨ 하단 토스 스타일 바텀 시트 모달 레이아웃
+  // 행사 목록을 하단 시트로 보여주고 선택값을 상태에 저장합니다.
   void _showTossStyleSheet(List<String> eventNames) {
     showModalBottomSheet(
       context: context,
@@ -255,7 +282,11 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                 padding: EdgeInsets.only(left: 24, top: 24, bottom: 16),
                 child: Text(
                   "행사 선택",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _tossBlack),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _tossBlack,
+                  ),
                 ),
               ),
               ...eventNames.map((String name) {
@@ -267,9 +298,14 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                   },
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 18,
+                    ),
                     decoration: BoxDecoration(
-                      border: Border(bottom: BorderSide(color: _tossDivider, width: 0.5)),
+                      border: Border(
+                        bottom: BorderSide(color: _tossDivider, width: 0.5),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -278,11 +314,18 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                           name,
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
                             color: isSelected ? _tossBlue : _tossBlack,
                           ),
                         ),
-                        if (isSelected) const Icon(Icons.check_rounded, color: _tossBlue, size: 22),
+                        if (isSelected)
+                          const Icon(
+                            Icons.check_rounded,
+                            color: _tossBlue,
+                            size: 22,
+                          ),
                       ],
                     ),
                   ),
@@ -310,7 +353,11 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
           const SizedBox(height: 8),
           Text(
             '$count명',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ],
       ),

@@ -12,7 +12,7 @@ class AdminAttendanceList extends StatefulWidget {
 class _AdminAttendanceListState extends State<AdminAttendanceList> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // 토스 스타일 상수 정의
+  // 화면 전체에서 반복해서 쓰는 색상값입니다.
   static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreen = Color(0xFF00AD5C);
   static const _tossGrey = Color(0xFF8B95A1);
@@ -27,13 +27,12 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
         backgroundColor: _tossBg,
         elevation: 0,
         scrolledUnderElevation: 0,
-        // 🎯 이미지와 매칭되는 토스 스타일 얇은 뒤로가기 화살표 반영
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(
-            Icons.arrow_back_ios_new_rounded, // 얇고 꺾인 디자인의 아이콘
+            Icons.arrow_back_ios_new_rounded,
             color: _tossBlack,
-            size: 20, // 토스 특유의 컴팩트한 사이즈
+            size: 20,
           ),
         ),
         title: const Text(
@@ -102,7 +101,7 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
     );
   }
 
-  // 상단 총 출석 인원 요약 헤더 카드
+  // Firestore 출석 문서 개수로 현재 출석 인원을 요약합니다.
   Widget _buildSummaryHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -137,7 +136,7 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
     );
   }
 
-  // 데이터가 없을 때 표시할 빈 UI 상태창
+  // 출석 데이터가 아직 없을 때 보여주는 빈 상태 화면입니다.
   Widget _buildEmptyState() {
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -168,7 +167,7 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
     );
   }
 
-  // 실제 Firestore 문서 필드 기반으로 매칭한 출석 명단 리스트 카드 위젯
+  // Firestore 문서를 한 명의 출석 카드로 변환합니다.
   Widget _buildAttendanceListItem(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {

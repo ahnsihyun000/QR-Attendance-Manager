@@ -1,5 +1,5 @@
 class AppConstants {
-  // 배재대학교 전체 학과 리스트 (중앙 관리용)
+  // 학과 선택 UI에서 공통으로 사용할 배재대학교 학과 목록입니다.
   static const List<String> departments = [
     '국어국문한국어교육학과',
     '심리상담학과',

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../utils/qr_manager.dart'; // 🎯 경로 확인하세요!
+import '../utils/qr_manager.dart';
 
 class AdminQrCameraTab extends StatefulWidget {
   const AdminQrCameraTab({super.key});
@@ -28,7 +28,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
     super.dispose();
   }
 
-  // 🎯 동적 QR 데이터 검증 및 처리 로직
+  // QR 검증, 중복 확인, 출석 저장을 한 번의 스캔 흐름으로 처리합니다.
   Future<void> _handleQrDetection(String qrRawValue) async {
     if (_isProcessing) return;
 
@@ -37,12 +37,10 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
     });
 
     try {
-      // 1️⃣ DynamicQRManager를 통한 검증 실행
       final result = DynamicQRManager.verify(qrRawValue);
 
       if (!result['success']) {
         _showResultSnackBar(
-          context,
           result['message'] ?? "유효하지 않은 QR입니다.",
           isSuccess: false,
         );
@@ -53,7 +51,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
       final studentId = result['studentId'];
       final userName = result['userName'];
 
-      // 2️⃣ 오늘 날짜 기반 중복 체크 로직 (기존과 동일)
+      // 같은 학생이 같은 날짜에 여러 번 출석 처리되지 않도록 문서 ID를 고정합니다.
       final now = DateTime.now();
       final todayStr =
           "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}";
@@ -64,7 +62,6 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
 
       if (docSnapshot.exists) {
         _showResultSnackBar(
-          context,
           "$userName ($studentId)\n이미 출석 완료된 학생입니다.",
           isSuccess: false,
         );
@@ -72,7 +69,6 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
         return;
       }
 
-      // 3️⃣ 출석 데이터 업로드
       await docRef.set({
         'studentId': studentId,
         'userName': userName,
@@ -80,26 +76,24 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
       });
 
       _showResultSnackBar(
-        context,
         "$userName ($studentId)\n출석 처리가 완료되었습니다.",
         isSuccess: true,
       );
       await Future.delayed(const Duration(seconds: 2));
     } catch (e) {
-      _showResultSnackBar(context, "오류 발생: ${e.toString()}", isSuccess: false);
+      _showResultSnackBar("오류 발생: ${e.toString()}", isSuccess: false);
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isProcessing = false;
         });
+      }
     }
   }
 
-  void _showResultSnackBar(
-    BuildContext context,
-    String message, {
-    required bool isSuccess,
-  }) {
+  void _showResultSnackBar(String message, {required bool isSuccess}) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -166,7 +160,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 15,
                     ),
                   ],
@@ -179,8 +173,9 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
                         controller: _scannerController,
                         onDetect: (capture) {
                           final barcode = capture.barcodes.first;
-                          if (barcode.rawValue != null)
+                          if (barcode.rawValue != null) {
                             _handleQrDetection(barcode.rawValue!);
+                          }
                         },
                       ),
                       if (_isProcessing)
@@ -217,7 +212,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "💡 동적 QR 스캔 가이드",
+            "동적 QR 스캔 가이드",
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,

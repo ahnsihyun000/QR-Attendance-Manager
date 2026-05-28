@@ -1,25 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-/// [CommonQrWidget]은 우리 프로젝트의 공통 QR 생성 위젯입니다.
-/// 팀원 여러분, UI에서 QR 코드가 필요하면 이 위젯을 불러서 사용하세요!
+/// QR 코드를 흰색 배경 위에 안정적으로 표시하는 공통 위젯입니다.
 class CommonQrWidget extends StatelessWidget {
-  /// QR에 담고 싶은 텍스트나 데이터를 입력받습니다.
+  /// QR에 담을 원본 문자열입니다.
   final String data;
-  
-  /// QR 코드의 크기를 정합니다. (기본값 200)
+
+  /// 화면에 표시할 QR 코드 크기입니다.
   final double size;
 
-  const CommonQrWidget({
-    super.key,
-    required this.data,
-    this.size = 200.0,
-  });
+  const CommonQrWidget({super.key, required this.data, this.size = 200.0});
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min, // 필요한 만큼만 공간 차지
+      mainAxisSize: MainAxisSize.min,
       children: [
         // QR 인식률을 높이기 위해 흰색 배경 컨테이너를 사용합니다.
         Container(
@@ -27,13 +22,9 @@ class CommonQrWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: Colors.grey.shade300), // 살짝 테두리 추가
+            border: Border.all(color: Colors.grey.shade300),
           ),
-          child: QrImageView(
-            data: data,
-            version: QrVersions.auto,
-            size: size,
-          ),
+          child: QrImageView(data: data, version: QrVersions.auto, size: size),
         ),
         const SizedBox(height: 8),
         const Text(

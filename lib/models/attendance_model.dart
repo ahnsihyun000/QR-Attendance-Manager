@@ -1,27 +1,27 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AttendanceModel {
-  final String eventId; // 행사 ID
-  final String userUid; // 사용자 고유 ID
-  final String userName; // 사용자 이름 (추가: 리스트 띄울 때 편함)
-  final DateTime timestamp; // 출석 시간
-  final String status; // 상태 (추가: 출석/지각/조퇴)
+  final String eventId;
+  final String userUid;
+  final String userName;
+  final DateTime timestamp;
+  final String status;
 
   AttendanceModel({
     required this.eventId,
     required this.userUid,
-    required this.userName, // 추가
+    required this.userName,
     required this.timestamp,
-    this.status = '출석', // 추가
+    this.status = '출석',
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json) =>
       AttendanceModel(
         eventId: json['eventId'] ?? '',
         userUid: json['userUid'] ?? '',
-        userName: json['userName'] ?? '', // 추가
+        userName: json['userName'] ?? '',
         timestamp: (json['timestamp'] as Timestamp).toDate(),
-        status: json['status'] ?? '출석', // 추가
+        status: json['status'] ?? '출석',
       );
   factory AttendanceModel.fromFirestore(DocumentSnapshot doc) {
     return AttendanceModel.fromJson(doc.data() as Map<String, dynamic>);
@@ -30,8 +30,8 @@ class AttendanceModel {
   Map<String, dynamic> toJson() => {
     'eventId': eventId,
     'userUid': userUid,
-    'userName': userName, // 추가
+    'userName': userName,
     'timestamp': timestamp,
-    'status': status, // 추가
+    'status': status,
   };
 }
