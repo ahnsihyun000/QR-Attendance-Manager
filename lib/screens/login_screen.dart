@@ -12,8 +12,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // 로그인 입력값을 가져오기 위한 컨트롤러입니다.
   final _idController = TextEditingController();
   final _pwController = TextEditingController();
+
+  // 로그인 요청 중 버튼을 잠그고 로딩 인디케이터를 보여주기 위한 값입니다.
   bool _isLoading = false;
 
   // 로그인 화면에서 반복해서 쓰는 색상값입니다.
@@ -100,6 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 학번, 비밀번호, 승인 상태를 순서대로 확인합니다.
   Future<void> _login() async {
+    // Firestore 저장값과 비교하기 전에 입력 공백을 제거합니다.
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
 
@@ -112,6 +116,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // users 컬렉션에서 입력한 학번과 같은 회원 문서를 찾습니다.
+      // 회원가입 때 저장한 studentId 필드를 기준으로 조회합니다.
       final userQuery = await FirebaseFirestore.instance
           .collection('users')
           .where('studentId', isEqualTo: id)
@@ -125,12 +131,15 @@ class _LoginScreenState extends State<LoginScreen> {
       final userDoc = userQuery.docs.first;
       final data = userDoc.data();
 
+      // 현재 프로젝트에서는 입력 비밀번호와 Firestore 비밀번호 문자열을 직접 비교합니다.
+      // 실제 서비스에서는 비밀번호 해시 저장 방식으로 확장하는 것이 좋습니다.
       final String dbPassword = '${data['password'] ?? ''}'.trim();
       if (dbPassword != pw) {
         _showSnackBar("비밀번호가 맞지 않아요.");
         return;
       }
 
+      // 관리자가 승인하지 않은 사용자는 QR 화면으로 이동하지 못하게 차단합니다.
       final String status = data['status'] ?? "비승인";
       if (status != "승인") {
         if (!mounted) return;
@@ -140,6 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
+      // 로그인에 성공하면 사용자 데이터를 QR 화면에 넘겨 QR 생성에 사용합니다.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => QRScannerPage(userData: data)),

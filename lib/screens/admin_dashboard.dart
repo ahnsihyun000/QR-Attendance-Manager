@@ -14,13 +14,18 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
+  // 하단 탭바에서 현재 선택된 화면 인덱스입니다.
   int _currentIndex = 0;
+
+  // 로그아웃 처리 중 카메라 탭이 계속 살아있지 않도록 제어합니다.
   bool _isLoggingOut = false;
 
   static const _tossBlue = Color(0xFF3182F6);
   static const _tossGreyText = Color(0xFF8B95A1);
   static const _tossBg = Color(0xFFF2F4F6);
 
+  // IndexedStack에 들어갈 관리자 주요 화면 목록입니다.
+  // IndexedStack을 사용하면 탭을 바꿔도 화면 상태가 갑자기 초기화되지 않습니다.
   List<Widget> get _pages => [
     AdminHomeTab(onLogoutPress: () => _showLogoutDialog(context)),
     const AdminAttendanceList(),
@@ -31,10 +36,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   ];
 
   void _changeTab(int index) {
+    // 로그아웃 중에는 탭 이동을 막아 화면 전환 충돌을 방지합니다.
     if (_isLoggingOut) return;
     setState(() => _currentIndex = index);
   }
 
+  // 관리자 로그아웃 여부를 한 번 더 확인하는 팝업입니다.
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -72,6 +79,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             onPressed: () async {
               Navigator.pop(dialogContext);
 
+              // 카메라가 켜진 탭에서 로그아웃할 때 컨트롤러 충돌이 생기지 않도록 홈 탭으로 먼저 돌립니다.
               setState(() {
                 _isLoggingOut = true;
                 _currentIndex = 0;
@@ -116,6 +124,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
+
+        // 관리자 화면에서는 시스템 뒤로가기 대신 홈 탭 이동 또는 로그아웃 안내를 제공합니다.
         if (_currentIndex != 0) {
           _changeTab(0);
         } else {
@@ -183,6 +193,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 }
 
+/// 관리자 홈에서 각 기능 화면으로 이동하는 카드 메뉴입니다.
 class AdminHomeTab extends StatelessWidget {
   final VoidCallback onLogoutPress;
 
@@ -222,6 +233,7 @@ class AdminHomeTab extends StatelessWidget {
                 iconColor: const Color(0xFFFF9800),
                 iconBgColor: const Color(0xFFFFF3E0),
                 onTap: () {
+                  // 사전 신청자 목록을 Firestore에서 읽어 보여주는 화면으로 이동합니다.
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -238,6 +250,7 @@ class AdminHomeTab extends StatelessWidget {
                 iconColor: const Color(0xFF00AD5C),
                 iconBgColor: const Color(0xFFE5F7ED),
                 onTap: () {
+                  // QR 스캔으로 저장된 attendance 컬렉션의 출석 기록을 확인합니다.
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -254,6 +267,7 @@ class AdminHomeTab extends StatelessWidget {
                 iconColor: const Color(0xFF3182F6),
                 iconBgColor: const Color(0xFFE8F3FF),
                 onTap: () {
+                  // 카메라를 열어 학생 QR을 스캔하고 출석 처리하는 화면입니다.
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -270,6 +284,7 @@ class AdminHomeTab extends StatelessWidget {
                 iconColor: const Color(0xFFFF6B6B),
                 iconBgColor: const Color(0xFFFFEAEA),
                 onTap: () {
+                  // 사전 신청자 수와 출석자 수를 비교해 행사별 출석률을 보여줍니다.
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -286,6 +301,7 @@ class AdminHomeTab extends StatelessWidget {
                 iconColor: const Color(0xFF6B66FF),
                 iconBgColor: const Color(0xFFF0F0FF),
                 onTap: () {
+                  // users 컬렉션의 승인 상태를 관리하는 화면입니다.
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -333,6 +349,7 @@ class AdminHomeTab extends StatelessWidget {
     required Color iconBgColor,
     required VoidCallback onTap,
   }) {
+    // 관리자 기능을 동일한 형태의 카드로 보여주기 위한 재사용 UI입니다.
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

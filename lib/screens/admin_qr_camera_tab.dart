@@ -12,11 +12,15 @@ class AdminQrCameraTab extends StatefulWidget {
 
 class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // mobile_scanner 패키지의 카메라 컨트롤러입니다.
+  // detectionSpeed는 같은 QR을 너무 빠르게 반복 감지하지 않도록 normal로 설정했습니다.
   final MobileScannerController _scannerController = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
   );
 
+  // QR 처리 중에는 추가 스캔을 막아 중복 저장을 방지합니다.
   bool _isProcessing = false;
   static const _tossGreen = Color(0xFF00AD5C);
   static const _tossBlack = Color(0xFF191F28);
@@ -30,6 +34,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
 
   // QR 검증, 중복 확인, 출석 저장을 한 번의 스캔 흐름으로 처리합니다.
   Future<void> _handleQrDetection(String qrRawValue) async {
+    // 이미 처리 중인 QR이 있으면 새 감지 이벤트는 무시합니다.
     if (_isProcessing) return;
 
     setState(() {
@@ -37,6 +42,8 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
     });
 
     try {
+      // QR 문자열의 해시와 유효 시간을 먼저 검증합니다.
+      // 여기서 실패하면 Firestore에는 접근하지 않고 바로 오류를 보여줍니다.
       final result = DynamicQRManager.verify(qrRawValue);
 
       if (!result['success']) {
@@ -60,6 +67,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
       final docRef = _firestore.collection('attendance').doc(docId);
       final docSnapshot = await docRef.get();
 
+      // 같은 docId가 이미 존재하면 오늘 출석이 끝난 학생으로 판단합니다.
       if (docSnapshot.exists) {
         _showResultSnackBar(
           "$userName ($studentId)\n이미 출석 완료된 학생입니다.",
@@ -69,6 +77,7 @@ class _AdminQrCameraTabState extends State<AdminQrCameraTab> {
         return;
       }
 
+      // 중복 기록이 없을 때만 attendance 컬렉션에 출석 문서를 새로 저장합니다.
       await docRef.set({
         'studentId': studentId,
         'userName': userName,

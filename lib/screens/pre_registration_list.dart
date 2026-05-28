@@ -21,6 +21,8 @@ class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
   // Firestore 신청자 문서를 화면 표시용 Map 목록으로 변환합니다.
   Future<List<Map<String, dynamic>>> _loadApplicants() async {
     try {
+      // 사전 신청자 명단은 pre-investigation list 컬렉션에서 가져옵니다.
+      // timeout을 둬서 네트워크 지연이 길어질 때 사용자에게 오류 상태를 보여줄 수 있게 합니다.
       final snapshot = await _firestore
           .collection('pre-investigation list')
           .get()
@@ -42,8 +44,10 @@ class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
         final timestampData = data['timestamp'];
 
         if (timestampData != null) {
+          // Firestore Timestamp로 저장된 경우 DateTime으로 변환합니다.
           if (timestampData is Timestamp) {
             rawDateTime = timestampData.toDate();
+            // 문자열로 들어온 예외 데이터도 최대한 파싱해 화면에 표시합니다.
           } else if (timestampData is String) {
             rawDateTime = DateTime.tryParse(timestampData) ?? DateTime(1970);
           }
@@ -56,6 +60,7 @@ class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
         }
 
         if (uid.isNotEmpty || name.isNotEmpty) {
+          // 화면에서 필요한 값만 Map으로 정리해 리스트 카드에 전달합니다.
           applicantList.add({
             'uid': uid.isEmpty ? "학번 누락" : uid,
             'name': name.isEmpty ? "이름 없음" : name,
@@ -66,6 +71,7 @@ class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
         }
       }
 
+      // 최근 신청자가 위에 보이도록 신청 시간 기준 내림차순 정렬합니다.
       applicantList.sort(
         (a, b) => (b['rawDateTime'] as DateTime).compareTo(
           a['rawDateTime'] as DateTime,
@@ -107,6 +113,7 @@ class _PreRegistrationScreenState extends State<PreRegistrationScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
+          // 아래로 당겨 새로고침하면 FutureBuilder가 다시 _loadApplicants를 호출합니다.
           setState(() {});
         },
         color: _tossBlue,

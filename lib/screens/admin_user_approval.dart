@@ -13,6 +13,7 @@ class _AdminUserApprovalScreenState extends State<AdminUserApprovalScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // 승인/비승인 탭 중 현재 보고 있는 상태입니다.
+  // 이 값에 따라 users 컬렉션 문서를 화면에서 필터링합니다.
   String _selectedStatus = "비승인";
 
   static const _tossBlue = Color(0xFF3182F6);
@@ -27,6 +28,8 @@ class _AdminUserApprovalScreenState extends State<AdminUserApprovalScreen> {
     String targetStatus,
   ) async {
     try {
+      // users 문서의 status 값을 "승인" 또는 "비승인"으로 갱신합니다.
+      // merge 옵션을 사용해 비밀번호, 이름, 학번 같은 기존 필드는 유지합니다.
       await _firestore.collection('users').doc(docId).set({
         'status': targetStatus,
         'isApproved': FieldValue.delete(),
@@ -114,6 +117,7 @@ class _AdminUserApprovalScreenState extends State<AdminUserApprovalScreen> {
 
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
+              // 사용자 승인 상태가 바뀌면 목록도 바로 갱신되도록 실시간 스트림을 사용합니다.
               stream: _firestore.collection('users').snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -131,12 +135,14 @@ class _AdminUserApprovalScreenState extends State<AdminUserApprovalScreen> {
                 final filteredDocs = allDocs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
 
+                  // 과거 데이터에 isApproved만 남아 있어도 현재 탭 기준에 맞게 분류합니다.
                   if (data.containsKey('isApproved') &&
                       !data.containsKey('status')) {
                     final bool legacyApproved = data['isApproved'] ?? false;
                     return (legacyApproved ? "승인" : "비승인") == _selectedStatus;
                   }
 
+                  // 현재 구조에서는 status 문자열을 기준으로 승인 여부를 판단합니다.
                   final String userStatus = data['status'] ?? "비승인";
                   return userStatus == _selectedStatus;
                 }).toList();
@@ -291,6 +297,7 @@ class _AdminUserApprovalScreenState extends State<AdminUserApprovalScreen> {
   }
 
   Widget _buildFilterTabs() {
+    // 승인 대기 사용자와 승인 완료 사용자를 한 화면에서 탭으로 나누어 보여줍니다.
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
       child: Row(
@@ -316,6 +323,7 @@ class _AdminUserApprovalScreenState extends State<AdminUserApprovalScreen> {
     required bool isActive,
     required VoidCallback onTap,
   }) {
+    // 선택된 탭은 흰 배경과 파란 글씨로 강조합니다.
     return Expanded(
       child: GestureDetector(
         onTap: onTap,

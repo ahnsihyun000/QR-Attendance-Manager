@@ -49,6 +49,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
         centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
+        // 먼저 사전 신청 명단을 읽어 행사 목록과 전체 신청자 수를 계산합니다.
         stream: FirebaseFirestore.instance
             .collection('pre-investigation list')
             .snapshots(),
@@ -63,6 +64,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
           final preDocs = preInvestigationSnapshot.data?.docs ?? [];
           Set<String> eventNameSet = {};
 
+          // department 필드를 행사명처럼 사용해 통계에서 선택 가능한 목록을 만듭니다.
           for (var doc in preDocs) {
             final data = doc.data() as Map<String, dynamic>;
             if (data['department'] != null) {
@@ -73,12 +75,14 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
           List<String> eventNames = eventNameSet.toList()..sort();
           if (eventNames.isEmpty) eventNames.add('등록된 행사 없음');
 
+          // 선택된 행사가 아직 없거나 삭제된 경우 첫 번째 행사로 자동 선택합니다.
           if (_selectedEventName == null ||
               !eventNames.contains(_selectedEventName)) {
             _selectedEventName = eventNames.first;
           }
 
           return StreamBuilder<QuerySnapshot>(
+            // 실제 출석 기록은 attendance 컬렉션에서 실시간으로 읽습니다.
             stream: FirebaseFirestore.instance
                 .collection('attendance')
                 .snapshots(),
@@ -109,6 +113,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
 
                   bool hasAttended = false;
 
+                  // attendance 문서 중 같은 학번이 하나라도 있으면 출석한 것으로 인정합니다.
                   for (var attDoc in attendanceDocs) {
                     final attData = attDoc.data() as Map<String, dynamic>;
                     final String attStudentId = (attData['studentId'] ?? '')
@@ -125,11 +130,13 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                   if (hasAttended) {
                     attendedCount++;
                   } else {
+                    // 사전 신청자는 있지만 출석 기록이 없으면 미출석 인원으로 계산합니다.
                     missingCount++;
                   }
                 }
               }
 
+              // 전체 대상자가 0명일 때 0으로 나누는 오류가 나지 않도록 별도 처리합니다.
               int total = attendedCount + missingCount;
               double attendPercent = total == 0
                   ? 0
@@ -153,6 +160,7 @@ class _AdminStatisticsTabState extends State<AdminStatisticsTab> {
                         ),
                         child: Stack(
                           children: [
+                            // 출석 인원과 미출석 인원을 원형 차트로 시각화합니다.
                             PieChart(
                               PieChartData(
                                 sectionsSpace: 0,

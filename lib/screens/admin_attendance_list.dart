@@ -64,6 +64,7 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              // attendance 컬렉션의 출석 기록을 최신순으로 실시간 구독합니다.
               stream: _firestore
                   .collection('attendance')
                   .orderBy('timestamp', descending: true)
@@ -117,6 +118,7 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
           children: [
             const SizedBox(height: 6),
             StreamBuilder<QuerySnapshot>(
+              // 전체 출석 문서 개수를 세어 상단 요약 문구에 표시합니다.
               stream: _firestore.collection('attendance').snapshots(),
               builder: (context, snapshot) {
                 final count = snapshot.data?.docs.length ?? 0;
@@ -172,12 +174,15 @@ class _AdminAttendanceListState extends State<AdminAttendanceList> {
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
     final data = doc.data();
+
+    // QR 스캔 화면에서 저장한 필드명을 그대로 읽어 리스트 카드에 표시합니다.
     final String name = data['userName'] ?? '이름 없음';
     final String studentId = data['studentId'] ?? '학번 없음';
     final Timestamp? timestamp = data['timestamp'] as Timestamp?;
 
     String formattedTime = '-';
     if (timestamp != null) {
+      // Firestore Timestamp를 한국어 오전/오후 시간 형식으로 바꿉니다.
       formattedTime = DateFormat('a hh:mm', 'ko_KR').format(timestamp.toDate());
     }
 

@@ -9,9 +9,12 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  // 사용자가 입력한 회원가입 정보를 읽기 위한 컨트롤러입니다.
   final _idController = TextEditingController();
   final _pwController = TextEditingController();
   final _nameController = TextEditingController();
+
+  // Firebase 요청 중 버튼 중복 클릭을 막고 로딩 표시를 보여주기 위한 상태값입니다.
   bool _isLoading = false;
 
   // 회원가입 화면에서 반복해서 쓰는 색상값입니다.
@@ -48,10 +51,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   // 사전 신청 명단과 일치하는 학생만 가입 승인 대기 상태로 저장합니다.
   Future<void> _register() async {
+    // 앞뒤 공백 때문에 조회가 실패하지 않도록 입력값을 trim 처리합니다.
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
     final String name = _nameController.text.trim();
 
+    // 필수 입력값이 비어 있으면 Firestore 조회를 하지 않고 바로 안내합니다.
     if (id.isEmpty || pw.isEmpty || name.isEmpty) {
       _showSnackBar("모든 정보를 입력해 주세요.");
       return;
@@ -60,6 +65,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // 사전 신청 명단에 학번과 이름이 모두 일치하는 문서가 있는지 확인합니다.
+      // 학번만 맞거나 이름만 맞는 경우는 다른 사람 정보일 수 있으므로 가입을 허용하지 않습니다.
       final preRegQuery = await FirebaseFirestore.instance
           .collection('pre-investigation list')
           .where('studentId', isEqualTo: id)
@@ -71,11 +78,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
         return;
       }
 
+      // users 컬렉션에서 같은 학번으로 이미 가입된 기록이 있는지 1차로 확인합니다.
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(id)
           .get();
 
+      // 실제 저장은 "학번 이름" 형태의 문서 ID를 사용하므로 해당 ID도 함께 중복 확인합니다.
       String docId = '$id $name';
       final alternativeDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -87,6 +96,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
         return;
       }
 
+      // 가입 요청은 바로 승인하지 않고 "비승인" 상태로 저장합니다.
+      // 이후 관리자가 승인 화면에서 status를 "승인"으로 변경해야 로그인할 수 있습니다.
       await FirebaseFirestore.instance.collection('users').doc(docId).set({
         'studentId': id,
         'password': pw,

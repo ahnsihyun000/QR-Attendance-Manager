@@ -5,6 +5,8 @@ import '../utils/qr_manager.dart';
 import 'login_screen.dart';
 
 class QRScannerPage extends StatefulWidget {
+  // 로그인 화면에서 전달받은 사용자 문서 데이터입니다.
+  // QR 생성에는 studentId와 name 필드가 사용됩니다.
   final Map<String, dynamic> userData;
 
   const QRScannerPage({super.key, required this.userData});
@@ -21,6 +23,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
   static const _cardBorder = Color(0xFFE5E8EB);
 
   late String _qrData;
+
+  // QR 만료 시간을 화면에 표시하고, 시간이 끝나면 새 QR을 만들기 위한 타이머입니다.
   Timer? _timer;
   int _secondsLeft = 30;
 
@@ -43,9 +47,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
   }
 
   void _refreshQR() {
+    // Firestore users 문서의 학번과 이름을 꺼내 QR payload 생성에 사용합니다.
     final studentId = '${widget.userData['studentId'] ?? ''}'.trim();
     final name = '${widget.userData['name'] ?? ''}'.trim();
+
     setState(() {
+      // DynamicQRManager가 학번, 이름, 현재 시간창을 조합해 위변조 방지 QR 문자열을 만듭니다.
       _qrData = DynamicQRManager.generate(studentId, name);
       _secondsLeft = 30;
     });
@@ -53,10 +60,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   void dispose() {
+    // 화면을 벗어날 때 타이머를 종료해 백그라운드 setState 호출을 막습니다.
     _timer?.cancel();
     super.dispose();
   }
 
+  // 학생이 QR 화면에서 로그아웃할 때 로그인 화면으로 돌아갑니다.
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -115,6 +124,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 사용자 정보가 일부 누락되어도 화면이 깨지지 않도록 기본 문구를 넣습니다.
     final name = '${widget.userData['name'] ?? '이름 없음'}'.trim();
     final studentId = '${widget.userData['studentId'] ?? '학번 누락'}'.trim();
     final department = '${widget.userData['department'] ?? '행사 참여자'}'.trim();
@@ -187,6 +197,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     ),
 
                     Container(
+                      // QR 자체는 qr_flutter 패키지의 QrImageView로 렌더링합니다.
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: _tossBg,
