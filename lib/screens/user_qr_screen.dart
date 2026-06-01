@@ -159,7 +159,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   border: Border.all(color: _cardBorder, width: 0.8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.015),
+                      color: Colors.black.withValues(alpha: 0.015),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
