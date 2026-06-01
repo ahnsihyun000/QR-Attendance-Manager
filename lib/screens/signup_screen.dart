@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart'; // 👈 패키지 연동을 위한 올바른 import 추가
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -23,6 +24,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   static const _tossTextPrimary = Color(0xFF191F28);
   static const _tossTextSecondary = Color(0xFF4E5968);
   static const _tossHint = Color(0xFFB0B8C1);
+
+  // 🔗 사전 신청 구글 폼 주소 상수 정의
+  static const _preRegUrl = "https://forms.gle/RbhkcgTvArK4UJkH8";
 
   @override
   void dispose() {
@@ -49,14 +53,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  // 🌐 외부 브라우저로 사전 신청 링크를 여는 함수
+  Future<void> _launchPreRegistration() async {
+    final Uri url = Uri.parse(_preRegUrl);
+    try {
+      // 최신 url_launcher 규격에 맞춘 안전한 비동기 호출 링크 오픈
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        _showSnackBar("사전 신청 페이지를 열 수 없습니다.");
+      }
+    } catch (e) {
+      _showSnackBar("링크 연결 중 오류가 발생했습니다.");
+    }
+  }
+
   // 사전 신청 명단과 일치하는 학생만 가입 승인 대기 상태로 저장합니다.
   Future<void> _register() async {
-    // 앞뒤 공백 때문에 조회가 실패하지 않도록 입력값을 trim 처리합니다.
     final String id = _idController.text.trim();
     final String pw = _pwController.text.trim();
     final String name = _nameController.text.trim();
 
-    // 필수 입력값이 비어 있으면 Firestore 조회를 하지 않고 바로 안내합니다.
     if (id.isEmpty || pw.isEmpty || name.isEmpty) {
       _showSnackBar("모든 정보를 입력해 주세요.");
       return;
@@ -65,8 +80,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 사전 신청 명단에 학번과 이름이 모두 일치하는 문서가 있는지 확인합니다.
-      // 학번만 맞거나 이름만 맞는 경우는 다른 사람 정보일 수 있으므로 가입을 허용하지 않습니다.
       final preRegQuery = await FirebaseFirestore.instance
           .collection('pre-investigation list')
           .where('studentId', isEqualTo: id)
@@ -74,17 +87,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
           .get();
 
       if (preRegQuery.docs.isEmpty) {
-        _showSnackBar("사전 신청한 학생 정보와 일치하지 않습니다.\n행사에 참여하시려면 사전 신청을 진행해 주세요.");
+        _showSnackBar("사전 신청한 학생 정보와 일치하지 않습니다.\n하단의 버튼을 눌러 사전 신청을 먼저 진행해 주세요.");
         return;
       }
 
-      // users 컬렉션에서 같은 학번으로 이미 가입된 기록이 있는지 1차로 확인합니다.
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(id)
           .get();
 
-      // 실제 저장은 "학번 이름" 형태의 문서 ID를 사용하므로 해당 ID도 함께 중복 확인합니다.
       String docId = '$id $name';
       final alternativeDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -96,8 +107,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         return;
       }
 
-      // 가입 요청은 바로 승인하지 않고 "비승인" 상태로 저장합니다.
-      // 이후 관리자가 승인 화면에서 status를 "승인"으로 변경해야 로그인할 수 있습니다.
       await FirebaseFirestore.instance.collection('users').doc(docId).set({
         'studentId': id,
         'password': pw,
@@ -175,6 +184,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                 const SizedBox(height: 56),
                 _buildSubmitButton(),
+                
+                // 🔗 가입하기 버튼 하단에 정렬 배치된 사전 신청 링크 이동 버튼
+                const SizedBox(height: 16),
+                _buildPreRegistrationButton(),
+                
                 const SizedBox(height: 40),
               ],
             ),
@@ -220,6 +234,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  // 회원가입 요청 버튼
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
@@ -246,6 +261,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               )
             : const Text("가입하기"),
+      ),
+    );
+  }
+
+  // 💡 새로 추가된 토스 스타일의 [사전 신청하러 가기] 링크 버튼
+  Widget _buildPreRegistrationButton() {
+    return Align(
+      alignment: Alignment.centerRight, // 오른쪽 정렬
+      child: TextButton.icon(
+        onPressed: _launchPreRegistration,
+        style: TextButton.styleFrom(
+          foregroundColor: _tossTextSecondary,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        icon: const Text(
+          "아직 사전 신청을 안 하셨나요?",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _tossTextSecondary,
+          ),
+        ),
+        label: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          size: 14,
+          color: _tossBlue, // 화살표 아이콘만 토스 블루로 강조 포인트
+        ),
       ),
     );
   }
